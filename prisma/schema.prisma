@@ -1,0 +1,924 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== USER & AUTH ====================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  firstName     String    @map("first_name")
+  lastName      String    @map("last_name")
+  phone         String?
+  avatar        String?
+  isActive      Boolean   @default(true) @map("is_active")
+  isVerified    Boolean   @default(false) @map("is_verified")
+  lastLoginAt   DateTime? @map("last_login_at")
+  roleId        String?   @map("role_id")
+  role          Role?     @relation(fields: [roleId], references: [id])
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  employee      Employee?
+  customer      Customer?
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+model Role {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  displayName String       @map("display_name")
+  description String?
+  isSystem    Boolean      @default(false) @map("is_system")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  users       User[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(cuid())
+  resource    String
+  action      String
+  description String?
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  // Relations
+  roles       RolePermission[]
+
+  @@unique([resource, action])
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id")
+  permissionId String     @map("permission_id")
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ==================== ORGANIZATION ====================
+
+model Company {
+  id          String   @id @default(cuid())
+  name        String
+  nameAr      String?  @map("name_ar")
+  logo        String?
+  email       String?
+  phone       String?
+  website     String?
+  address     String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  divisions   Division[]
+  employees   Employee[]
+
+  @@map("companies")
+}
+
+model Division {
+  id          String       @id @default(cuid())
+  companyId   String       @map("company_id")
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  nameAr      String?      @map("name_ar")
+  code        String?
+  isActive    Boolean      @default(true) @map("is_active")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  departments Department[]
+  employees   Employee[]
+
+  @@map("divisions")
+}
+
+model Department {
+  id          String    @id @default(cuid())
+  divisionId  String    @map("division_id")
+  division    Division  @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+  name        String
+  nameAr      String?   @map("name_ar")
+  code        String?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  sections    Section[]
+  employees   Employee[]
+
+  @@map("departments")
+}
+
+model Section {
+  id           String     @id @default(cuid())
+  departmentId String     @map("department_id")
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  name         String
+  nameAr       String?    @map("name_ar")
+  code         String?
+  isActive     Boolean    @default(true) @map("is_active")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  employees    Employee[]
+
+  @@map("sections")
+}
+
+// ==================== EMPLOYEE ====================
+
+model Employee {
+  id              String    @id @default(cuid())
+  userId          String?   @unique @map("user_id")
+  user            User?     @relation(fields: [userId], references: [id])
+  employeeNo      String    @unique @map("employee_no")
+  firstName       String    @map("first_name")
+  lastName        String    @map("last_name")
+  firstNameAr     String?   @map("first_name_ar")
+  lastNameAr      String?   @map("last_name_ar")
+  email           String    @unique
+  phone           String?
+  nationalId      String?   @map("national_id")
+  dateOfBirth     DateTime? @map("date_of_birth")
+  hireDate        DateTime? @map("hire_date")
+  jobTitleId      String?   @map("job_title_id")
+  jobTitle        JobTitle? @relation(fields: [jobTitleId], references: [id])
+  companyId       String?   @map("company_id")
+  company         Company?  @relation(fields: [companyId], references: [id])
+  divisionId      String?   @map("division_id")
+  division        Division? @relation(fields: [divisionId], references: [id])
+  departmentId    String?   @map("department_id")
+  department      Department? @relation(fields: [departmentId], references: [id])
+  sectionId       String?   @map("section_id")
+  section         Section?  @relation(fields: [sectionId], references: [id])
+  managerId       String?   @map("manager_id")
+  manager         Employee? @relation("EmployeeManager", fields: [managerId], references: [id])
+  subordinates    Employee[] @relation("EmployeeManager")
+  hasSystemAccess Boolean   @default(false) @map("has_system_access")
+  isActive        Boolean   @default(true) @map("is_active")
+  lastLatitude    Float?    @map("last_latitude")
+  lastLongitude   Float?    @map("last_longitude")
+  lastLocationAt  DateTime? @map("last_location_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  zoneAssignments     EmployeeZone[]
+  serviceRequests     ServiceRequest[] @relation("AssignedEmployee")
+  scheduleAssignments ScheduleTeam[]
+  zoneHead            Zone[]           @relation("ZoneHead")
+
+  @@map("employees")
+}
+
+model JobTitle {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  nameAr    String?    @map("name_ar")
+  isActive  Boolean    @default(true) @map("is_active")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  employees Employee[]
+
+  @@map("job_titles")
+}
+
+// ==================== GEOGRAPHIC ====================
+
+model Country {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  nameAr    String?  @map("name_ar")
+  code      String   @unique
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  states    State[]
+
+  @@map("countries")
+}
+
+model State {
+  id        String   @id @default(cuid())
+  countryId String   @map("country_id")
+  country   Country  @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  name      String
+  nameAr    String?  @map("name_ar")
+  code      String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  districts District[]
+
+  @@unique([countryId, name])
+  @@map("states")
+}
+
+model District {
+  id           String       @id @default(cuid())
+  stateId      String       @map("state_id")
+  state        State        @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  name         String
+  nameAr       String?      @map("name_ar")
+  code         String?
+  isActive     Boolean      @default(true) @map("is_active")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  governorates Governorate[]
+
+  @@unique([stateId, name])
+  @@map("districts")
+}
+
+model Governorate {
+  id         String   @id @default(cuid())
+  districtId String   @map("district_id")
+  district   District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  name       String
+  nameAr     String?  @map("name_ar")
+  code       String?
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  zones      Zone[]
+
+  @@unique([districtId, name])
+  @@map("governorates")
+}
+
+model Zone {
+  id            String      @id @default(cuid())
+  governorateId String      @map("governorate_id")
+  governorate   Governorate @relation(fields: [governorateId], references: [id], onDelete: Cascade)
+  name          String
+  nameAr        String?     @map("name_ar")
+  code          String?     @unique
+  headId        String?     @map("head_id")
+  head          Employee?   @relation("ZoneHead", fields: [headId], references: [id])
+  isActive      Boolean     @default(true) @map("is_active")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  employees       EmployeeZone[]
+  properties      Property[]
+  serviceRequests ServiceRequest[]
+
+  @@unique([governorateId, name])
+  @@map("zones")
+}
+
+model EmployeeZone {
+  employeeId String   @map("employee_id")
+  zoneId     String   @map("zone_id")
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  zone       Zone     @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  isPrimary  Boolean  @default(false) @map("is_primary")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@id([employeeId, zoneId])
+  @@map("employee_zones")
+}
+
+// ==================== CUSTOMER ====================
+
+model Customer {
+  id            String       @id @default(cuid())
+  userId        String?      @unique @map("user_id")
+  user          User?        @relation(fields: [userId], references: [id])
+  customerNo    String       @unique @map("customer_no")
+  customerType  CustomerType @default(INDIVIDUAL) @map("customer_type")
+  firstName     String?      @map("first_name")
+  lastName      String?      @map("last_name")
+  firstNameAr   String?      @map("first_name_ar")
+  lastNameAr    String?      @map("last_name_ar")
+  orgName       String?      @map("org_name")
+  orgNameAr     String?      @map("org_name_ar")
+  email         String       @unique
+  phone         String?
+  altPhone      String?      @map("alt_phone")
+  nationalId    String?      @map("national_id")
+  isActive      Boolean      @default(true) @map("is_active")
+  isVerified    Boolean      @default(false) @map("is_verified")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  properties      CustomerProperty[]
+  serviceRequests ServiceRequest[]
+  invoices        Invoice[]
+
+  @@map("customers")
+}
+
+enum CustomerType {
+  INDIVIDUAL
+  ORGANIZATION
+}
+
+// ==================== PROPERTY ====================
+
+model Property {
+  id          String       @id @default(cuid())
+  propertyNo  String       @unique @map("property_no")
+  name        String
+  nameAr      String?      @map("name_ar")
+  typeId      String       @map("type_id")
+  type        PropertyType @relation(fields: [typeId], references: [id])
+  zoneId      String?      @map("zone_id")
+  zone        Zone?        @relation(fields: [zoneId], references: [id])
+  address     String?
+  addressAr   String?      @map("address_ar")
+  building    String?
+  floor       String?
+  unit        String?
+  area        String?
+  landmark    String?
+  latitude    Float?
+  longitude   Float?
+  qrCode      String?      @map("qr_code")
+  isActive    Boolean      @default(true) @map("is_active")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  customers       CustomerProperty[]
+  rooms           Room[]
+  assets          Asset[]
+  serviceRequests ServiceRequest[]
+
+  @@map("properties")
+}
+
+model PropertyType {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  nameAr    String?    @map("name_ar")
+  isActive  Boolean    @default(true) @map("is_active")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  properties Property[]
+
+  @@map("property_types")
+}
+
+model CustomerProperty {
+  customerId     String       @map("customer_id")
+  propertyId     String       @map("property_id")
+  customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  property       Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  ownershipType  OwnershipType @default(OWNER) @map("ownership_type")
+  isPrimary      Boolean      @default(false) @map("is_primary")
+  startDate      DateTime?    @map("start_date")
+  endDate        DateTime?    @map("end_date")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@id([customerId, propertyId])
+  @@map("customer_properties")
+}
+
+enum OwnershipType {
+  OWNER
+  TENANT
+}
+
+model Room {
+  id         String   @id @default(cuid())
+  propertyId String   @map("property_id")
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name       String
+  nameAr     String?  @map("name_ar")
+  floor      String?
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  assets     Asset[]
+
+  @@map("rooms")
+}
+
+// ==================== ASSET ====================
+
+model Asset {
+  id               String     @id @default(cuid())
+  assetNo          String     @unique @map("asset_no")
+  propertyId       String     @map("property_id")
+  property         Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  roomId           String?    @map("room_id")
+  room             Room?      @relation(fields: [roomId], references: [id])
+  typeId           String     @map("type_id")
+  type             AssetType  @relation(fields: [typeId], references: [id])
+  brand            String?
+  model            String?
+  serialNumber     String?    @map("serial_number")
+  purchaseDate     DateTime?  @map("purchase_date")
+  installDate      DateTime?  @map("install_date")
+  warrantyEndDate  DateTime?  @map("warranty_end_date")
+  amcEndDate       DateTime?  @map("amc_end_date")
+  specifications   Json?
+  qrCode           String?    @map("qr_code")
+  isActive         Boolean    @default(true) @map("is_active")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  serviceRequests  ServiceRequest[]
+
+  @@map("assets")
+}
+
+model AssetType {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  nameAr    String?  @map("name_ar")
+  icon      String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  assets    Asset[]
+
+  @@map("asset_types")
+}
+
+// ==================== SERVICE REQUEST ====================
+
+model ServiceRequest {
+  id              String        @id @default(cuid())
+  requestNo       String        @unique @map("request_no")
+  customerId      String        @map("customer_id")
+  customer        Customer      @relation(fields: [customerId], references: [id])
+  propertyId      String        @map("property_id")
+  property        Property      @relation(fields: [propertyId], references: [id])
+  assetId         String?       @map("asset_id")
+  asset           Asset?        @relation(fields: [assetId], references: [id])
+  zoneId          String        @map("zone_id")
+  zone            Zone          @relation(fields: [zoneId], references: [id])
+  complaintTypeId String        @map("complaint_type_id")
+  complaintType   ComplaintType @relation(fields: [complaintTypeId], references: [id])
+  requestType     RequestType   @default(ON_CALL) @map("request_type")
+  priority        Priority      @default(MEDIUM)
+  status          RequestStatus @default(NEW)
+  source          RequestSource @default(PORTAL)
+  title           String
+  description     String?
+  customerNotes   String?       @map("customer_notes")
+  internalNotes   String?       @map("internal_notes")
+  assignedToId    String?       @map("assigned_to_id")
+  assignedTo      Employee?     @relation("AssignedEmployee", fields: [assignedToId], references: [id])
+  slaStartAt      DateTime?     @map("sla_start_at")
+  slaDueAt        DateTime?     @map("sla_due_at")
+  startedAt       DateTime?     @map("started_at")
+  completedAt     DateTime?     @map("completed_at")
+  closedAt        DateTime?     @map("closed_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  timeline        RequestTimeline[]
+  attachments     RequestAttachment[]
+  quotations      Quotation[]
+  schedules       Schedule[]
+  materialUsage   MaterialUsage[]
+  invoice         Invoice?
+
+  @@map("service_requests")
+}
+
+enum RequestType {
+  ON_CALL
+  EMERGENCY
+  AMC
+  WARRANTY
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  EMERGENCY
+}
+
+enum RequestStatus {
+  NEW
+  ASSIGNED
+  SCHEDULED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  INVOICED
+  CLOSED
+  CANCELLED
+}
+
+enum RequestSource {
+  PORTAL
+  MOBILE
+  AI_CHAT
+  PHONE
+  EMAIL
+  WALK_IN
+}
+
+model ComplaintType {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  nameAr      String?  @map("name_ar")
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  serviceRequests ServiceRequest[]
+  slaConfigs      SlaConfig[]
+
+  @@map("complaint_types")
+}
+
+model RequestTimeline {
+  id               String         @id @default(cuid())
+  serviceRequestId String         @map("service_request_id")
+  serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+  action           String
+  description      String?
+  performedBy      String?        @map("performed_by")
+  createdAt        DateTime       @default(now()) @map("created_at")
+
+  @@map("request_timeline")
+}
+
+model RequestAttachment {
+  id               String         @id @default(cuid())
+  serviceRequestId String         @map("service_request_id")
+  serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+  fileName         String         @map("file_name")
+  fileType         String         @map("file_type")
+  fileSize         Int            @map("file_size")
+  filePath         String         @map("file_path")
+  uploadedBy       String?        @map("uploaded_by")
+  createdAt        DateTime       @default(now()) @map("created_at")
+
+  @@map("request_attachments")
+}
+
+// ==================== SLA ====================
+
+model SlaConfig {
+  id              String        @id @default(cuid())
+  name            String
+  priority        Priority
+  complaintTypeId String?       @map("complaint_type_id")
+  complaintType   ComplaintType? @relation(fields: [complaintTypeId], references: [id])
+  responseTime    Int           @map("response_time") // in minutes
+  resolutionTime  Int           @map("resolution_time") // in minutes
+  isActive        Boolean       @default(true) @map("is_active")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  @@map("sla_configs")
+}
+
+// ==================== QUOTATION ====================
+
+model Quotation {
+  id               String         @id @default(cuid())
+  quotationNo      String         @unique @map("quotation_no")
+  serviceRequestId String         @map("service_request_id")
+  serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id])
+  status           QuotationStatus @default(DRAFT)
+  subtotal         Decimal        @db.Decimal(10, 2)
+  taxAmount        Decimal        @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  discountAmount   Decimal        @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  total            Decimal        @db.Decimal(10, 2)
+  notes            String?
+  validUntil       DateTime?      @map("valid_until")
+  approvedAt       DateTime?      @map("approved_at")
+  approvedBy       String?        @map("approved_by")
+  createdBy        String         @map("created_by")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  items            QuotationItem[]
+
+  @@map("quotations")
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+model QuotationItem {
+  id          String    @id @default(cuid())
+  quotationId String    @map("quotation_id")
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  itemType    ItemType  @default(SERVICE) @map("item_type")
+  description String
+  quantity    Int       @default(1)
+  unitPrice   Decimal   @map("unit_price") @db.Decimal(10, 2)
+  total       Decimal   @db.Decimal(10, 2)
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@map("quotation_items")
+}
+
+enum ItemType {
+  SERVICE
+  MATERIAL
+  LABOR
+}
+
+// ==================== SCHEDULE ====================
+
+model Schedule {
+  id               String         @id @default(cuid())
+  serviceRequestId String         @map("service_request_id")
+  serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id])
+  scheduledDate    DateTime       @map("scheduled_date")
+  startTime        DateTime?      @map("start_time")
+  endTime          DateTime?      @map("end_time")
+  status           ScheduleStatus @default(SCHEDULED)
+  notes            String?
+  createdBy        String         @map("created_by")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  team             ScheduleTeam[]
+
+  @@map("schedules")
+}
+
+enum ScheduleStatus {
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
+}
+
+model ScheduleTeam {
+  scheduleId String   @map("schedule_id")
+  employeeId String   @map("employee_id")
+  schedule   Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  isLead     Boolean  @default(false) @map("is_lead")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@id([scheduleId, employeeId])
+  @@map("schedule_team")
+}
+
+// ==================== INVENTORY ====================
+
+model InventoryItem {
+  id            String   @id @default(cuid())
+  itemNo        String   @unique @map("item_no")
+  name          String
+  nameAr        String?  @map("name_ar")
+  categoryId    String   @map("category_id")
+  category      InventoryCategory @relation(fields: [categoryId], references: [id])
+  description   String?
+  unit          String   @default("piece")
+  unitPrice     Decimal  @default(0) @map("unit_price") @db.Decimal(10, 2)
+  currentStock  Int      @default(0) @map("current_stock")
+  minStock      Int      @default(0) @map("min_stock")
+  maxStock      Int?     @map("max_stock")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  materialUsage MaterialUsage[]
+  stockMovements StockMovement[]
+
+  @@map("inventory_items")
+}
+
+model InventoryCategory {
+  id        String          @id @default(cuid())
+  name      String          @unique
+  nameAr    String?         @map("name_ar")
+  isActive  Boolean         @default(true) @map("is_active")
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  items     InventoryItem[]
+
+  @@map("inventory_categories")
+}
+
+model MaterialUsage {
+  id               String         @id @default(cuid())
+  serviceRequestId String         @map("service_request_id")
+  serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id])
+  itemId           String         @map("item_id")
+  item             InventoryItem  @relation(fields: [itemId], references: [id])
+  quantity         Int
+  unitPrice        Decimal        @map("unit_price") @db.Decimal(10, 2)
+  total            Decimal        @db.Decimal(10, 2)
+  usedBy           String         @map("used_by")
+  usedAt           DateTime       @default(now()) @map("used_at")
+
+  @@map("material_usage")
+}
+
+model StockMovement {
+  id           String        @id @default(cuid())
+  itemId       String        @map("item_id")
+  item         InventoryItem @relation(fields: [itemId], references: [id])
+  movementType MovementType  @map("movement_type")
+  quantity     Int
+  unitPrice    Decimal?      @map("unit_price") @db.Decimal(10, 2)
+  reference    String?
+  notes        String?
+  createdBy    String        @map("created_by")
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  @@map("stock_movements")
+}
+
+enum MovementType {
+  PURCHASE
+  USAGE
+  ADJUSTMENT
+  RETURN
+  TRANSFER
+}
+
+// ==================== INVOICE ====================
+
+model Invoice {
+  id               String         @id @default(cuid())
+  invoiceNo        String         @unique @map("invoice_no")
+  serviceRequestId String         @unique @map("service_request_id")
+  serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id])
+  customerId       String         @map("customer_id")
+  customer         Customer       @relation(fields: [customerId], references: [id])
+  status           InvoiceStatus  @default(DRAFT)
+  subtotal         Decimal        @db.Decimal(10, 2)
+  taxAmount        Decimal        @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  discountAmount   Decimal        @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  total            Decimal        @db.Decimal(10, 2)
+  paidAmount       Decimal        @default(0) @map("paid_amount") @db.Decimal(10, 2)
+  dueDate          DateTime?      @map("due_date")
+  paidAt           DateTime?      @map("paid_at")
+  notes            String?
+  createdBy        String         @map("created_by")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  items            InvoiceItem[]
+  payments         Payment[]
+
+  @@map("invoices")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  PARTIAL
+  OVERDUE
+  CANCELLED
+}
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  invoiceId   String   @map("invoice_id")
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  itemType    ItemType @default(SERVICE) @map("item_type")
+  description String
+  quantity    Int      @default(1)
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(10, 2)
+  total       Decimal  @db.Decimal(10, 2)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("invoice_items")
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  paymentNo     String        @unique @map("payment_no")
+  invoiceId     String        @map("invoice_id")
+  invoice       Invoice       @relation(fields: [invoiceId], references: [id])
+  amount        Decimal       @db.Decimal(10, 2)
+  paymentMethod PaymentMethod @default(CASH) @map("payment_method")
+  reference     String?
+  notes         String?
+  receivedBy    String        @map("received_by")
+  receivedAt    DateTime      @default(now()) @map("received_at")
+
+  @@map("payments")
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BANK_TRANSFER
+  CHEQUE
+  ONLINE
+}
+
+// ==================== NOTIFICATION ====================
+
+model NotificationTemplate {
+  id        String            @id @default(cuid())
+  name      String            @unique
+  type      NotificationType
+  channel   NotificationChannel
+  subject   String?
+  subjectAr String?           @map("subject_ar")
+  body      String
+  bodyAr    String?           @map("body_ar")
+  isActive  Boolean           @default(true) @map("is_active")
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  @@map("notification_templates")
+}
+
+enum NotificationType {
+  REQUEST_CREATED
+  REQUEST_ASSIGNED
+  REQUEST_SCHEDULED
+  REQUEST_STARTED
+  REQUEST_COMPLETED
+  QUOTATION_SENT
+  QUOTATION_APPROVED
+  INVOICE_SENT
+  PAYMENT_RECEIVED
+  SLA_WARNING
+  SLA_BREACH
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  PUSH
+  IN_APP
+}
+
+// ==================== AUDIT ====================
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?  @map("user_id")
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  resource   String
+  resourceId String?  @map("resource_id")
+  oldValue   Json?    @map("old_value")
+  newValue   Json?    @map("new_value")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("audit_logs")
+}
