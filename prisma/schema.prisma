@@ -1,10 +1,12 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["fixitbh_ac"]
 }
 
 // ==================== USER & AUTH ====================
@@ -31,6 +33,7 @@ model User {
   auditLogs     AuditLog[]
 
   @@map("users")
+  @@schema("fixitbh_ac")
 }
 
 model Role {
@@ -47,6 +50,7 @@ model Role {
   permissions RolePermission[]
 
   @@map("roles")
+  @@schema("fixitbh_ac")
 }
 
 model Permission {
@@ -61,6 +65,7 @@ model Permission {
 
   @@unique([resource, action])
   @@map("permissions")
+  @@schema("fixitbh_ac")
 }
 
 model RolePermission {
@@ -71,6 +76,7 @@ model RolePermission {
 
   @@id([roleId, permissionId])
   @@map("role_permissions")
+  @@schema("fixitbh_ac")
 }
 
 // ==================== ORGANIZATION ====================
@@ -93,6 +99,7 @@ model Company {
   employees   Employee[]
 
   @@map("companies")
+  @@schema("fixitbh_ac")
 }
 
 model Division {
@@ -111,6 +118,7 @@ model Division {
   employees   Employee[]
 
   @@map("divisions")
+  @@schema("fixitbh_ac")
 }
 
 model Department {
@@ -129,6 +137,7 @@ model Department {
   employees   Employee[]
 
   @@map("departments")
+  @@schema("fixitbh_ac")
 }
 
 model Section {
@@ -146,6 +155,7 @@ model Section {
   employees    Employee[]
 
   @@map("sections")
+  @@schema("fixitbh_ac")
 }
 
 // ==================== EMPLOYEE ====================
@@ -192,6 +202,7 @@ model Employee {
   zoneHead            Zone[]           @relation("ZoneHead")
 
   @@map("employees")
+  @@schema("fixitbh_ac")
 }
 
 model JobTitle {
@@ -206,6 +217,7 @@ model JobTitle {
   employees Employee[]
 
   @@map("job_titles")
+  @@schema("fixitbh_ac")
 }
 
 // ==================== GEOGRAPHIC ====================
@@ -223,6 +235,7 @@ model Country {
   states    State[]
 
   @@map("countries")
+  @@schema("fixitbh_ac")
 }
 
 model State {
@@ -241,6 +254,7 @@ model State {
 
   @@unique([countryId, name])
   @@map("states")
+  @@schema("fixitbh_ac")
 }
 
 model District {
@@ -259,6 +273,7 @@ model District {
 
   @@unique([stateId, name])
   @@map("districts")
+  @@schema("fixitbh_ac")
 }
 
 model Governorate {
@@ -277,6 +292,7 @@ model Governorate {
 
   @@unique([districtId, name])
   @@map("governorates")
+  @@schema("fixitbh_ac")
 }
 
 model Zone {
@@ -299,6 +315,7 @@ model Zone {
 
   @@unique([governorateId, name])
   @@map("zones")
+  @@schema("fixitbh_ac")
 }
 
 model EmployeeZone {
@@ -311,6 +328,7 @@ model EmployeeZone {
 
   @@id([employeeId, zoneId])
   @@map("employee_zones")
+  @@schema("fixitbh_ac")
 }
 
 // ==================== CUSTOMER ====================
@@ -342,9 +360,11 @@ model Customer {
   invoices        Invoice[]
 
   @@map("customers")
+  @@schema("fixitbh_ac")
 }
 
 enum CustomerType {
+  @@schema("fixitbh_ac")
   INDIVIDUAL
   ORGANIZATION
 }
@@ -381,6 +401,7 @@ model Property {
   serviceRequests ServiceRequest[]
 
   @@map("properties")
+  @@schema("fixitbh_ac")
 }
 
 model PropertyType {
@@ -395,6 +416,7 @@ model PropertyType {
   properties Property[]
 
   @@map("property_types")
+  @@schema("fixitbh_ac")
 }
 
 model CustomerProperty {
@@ -410,9 +432,11 @@ model CustomerProperty {
 
   @@id([customerId, propertyId])
   @@map("customer_properties")
+  @@schema("fixitbh_ac")
 }
 
 enum OwnershipType {
+  @@schema("fixitbh_ac")
   OWNER
   TENANT
 }
@@ -432,6 +456,7 @@ model Room {
   assets     Asset[]
 
   @@map("rooms")
+  @@schema("fixitbh_ac")
 }
 
 // ==================== ASSET ====================
@@ -462,6 +487,7 @@ model Asset {
   serviceRequests  ServiceRequest[]
 
   @@map("assets")
+  @@schema("fixitbh_ac")
 }
 
 model AssetType {
@@ -477,6 +503,7 @@ model AssetType {
   assets    Asset[]
 
   @@map("asset_types")
+  @@schema("fixitbh_ac")
 }
 
 // ==================== SERVICE REQUEST ====================
@@ -521,9 +548,11 @@ model ServiceRequest {
   invoice         Invoice?
 
   @@map("service_requests")
+  @@schema("fixitbh_ac")
 }
 
 enum RequestType {
+  @@schema("fixitbh_ac")
   ON_CALL
   EMERGENCY
   AMC
@@ -531,6 +560,7 @@ enum RequestType {
 }
 
 enum Priority {
+  @@schema("fixitbh_ac")
   LOW
   MEDIUM
   HIGH
@@ -538,6 +568,7 @@ enum Priority {
 }
 
 enum RequestStatus {
+  @@schema("fixitbh_ac")
   NEW
   ASSIGNED
   SCHEDULED
@@ -550,6 +581,7 @@ enum RequestStatus {
 }
 
 enum RequestSource {
+  @@schema("fixitbh_ac")
   PORTAL
   MOBILE
   AI_CHAT
@@ -572,6 +604,7 @@ model ComplaintType {
   slaConfigs      SlaConfig[]
 
   @@map("complaint_types")
+  @@schema("fixitbh_ac")
 }
 
 model RequestTimeline {
@@ -584,6 +617,7 @@ model RequestTimeline {
   createdAt        DateTime       @default(now()) @map("created_at")
 
   @@map("request_timeline")
+  @@schema("fixitbh_ac")
 }
 
 model RequestAttachment {
@@ -598,6 +632,7 @@ model RequestAttachment {
   createdAt        DateTime       @default(now()) @map("created_at")
 
   @@map("request_attachments")
+  @@schema("fixitbh_ac")
 }
 
 // ==================== SLA ====================
@@ -615,6 +650,7 @@ model SlaConfig {
   updatedAt       DateTime      @updatedAt @map("updated_at")
 
   @@map("sla_configs")
+  @@schema("fixitbh_ac")
 }
 
 // ==================== QUOTATION ====================
@@ -641,9 +677,11 @@ model Quotation {
   items            QuotationItem[]
 
   @@map("quotations")
+  @@schema("fixitbh_ac")
 }
 
 enum QuotationStatus {
+  @@schema("fixitbh_ac")
   DRAFT
   SENT
   APPROVED
@@ -663,9 +701,11 @@ model QuotationItem {
   createdAt   DateTime  @default(now()) @map("created_at")
 
   @@map("quotation_items")
+  @@schema("fixitbh_ac")
 }
 
 enum ItemType {
+  @@schema("fixitbh_ac")
   SERVICE
   MATERIAL
   LABOR
@@ -690,9 +730,11 @@ model Schedule {
   team             ScheduleTeam[]
 
   @@map("schedules")
+  @@schema("fixitbh_ac")
 }
 
 enum ScheduleStatus {
+  @@schema("fixitbh_ac")
   SCHEDULED
   CONFIRMED
   IN_PROGRESS
@@ -711,6 +753,7 @@ model ScheduleTeam {
 
   @@id([scheduleId, employeeId])
   @@map("schedule_team")
+  @@schema("fixitbh_ac")
 }
 
 // ==================== INVENTORY ====================
@@ -737,6 +780,7 @@ model InventoryItem {
   stockMovements StockMovement[]
 
   @@map("inventory_items")
+  @@schema("fixitbh_ac")
 }
 
 model InventoryCategory {
@@ -751,6 +795,7 @@ model InventoryCategory {
   items     InventoryItem[]
 
   @@map("inventory_categories")
+  @@schema("fixitbh_ac")
 }
 
 model MaterialUsage {
@@ -766,6 +811,7 @@ model MaterialUsage {
   usedAt           DateTime       @default(now()) @map("used_at")
 
   @@map("material_usage")
+  @@schema("fixitbh_ac")
 }
 
 model StockMovement {
@@ -781,9 +827,11 @@ model StockMovement {
   createdAt    DateTime      @default(now()) @map("created_at")
 
   @@map("stock_movements")
+  @@schema("fixitbh_ac")
 }
 
 enum MovementType {
+  @@schema("fixitbh_ac")
   PURCHASE
   USAGE
   ADJUSTMENT
@@ -818,9 +866,11 @@ model Invoice {
   payments         Payment[]
 
   @@map("invoices")
+  @@schema("fixitbh_ac")
 }
 
 enum InvoiceStatus {
+  @@schema("fixitbh_ac")
   DRAFT
   SENT
   PAID
@@ -841,6 +891,7 @@ model InvoiceItem {
   createdAt   DateTime @default(now()) @map("created_at")
 
   @@map("invoice_items")
+  @@schema("fixitbh_ac")
 }
 
 model Payment {
@@ -856,9 +907,11 @@ model Payment {
   receivedAt    DateTime      @default(now()) @map("received_at")
 
   @@map("payments")
+  @@schema("fixitbh_ac")
 }
 
 enum PaymentMethod {
+  @@schema("fixitbh_ac")
   CASH
   CARD
   BANK_TRANSFER
@@ -882,9 +935,11 @@ model NotificationTemplate {
   updatedAt DateTime          @updatedAt @map("updated_at")
 
   @@map("notification_templates")
+  @@schema("fixitbh_ac")
 }
 
 enum NotificationType {
+  @@schema("fixitbh_ac")
   REQUEST_CREATED
   REQUEST_ASSIGNED
   REQUEST_SCHEDULED
@@ -899,6 +954,7 @@ enum NotificationType {
 }
 
 enum NotificationChannel {
+  @@schema("fixitbh_ac")
   EMAIL
   SMS
   PUSH
@@ -921,4 +977,5 @@ model AuditLog {
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@map("audit_logs")
+  @@schema("fixitbh_ac")
 }
