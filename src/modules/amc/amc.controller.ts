@@ -11,6 +11,8 @@ import {
   listAmcContractsQuerySchema,
   listSchedulesQuerySchema,
   listPaymentsQuerySchema,
+  rescheduleVisitSchema,
+  convertToServiceRequestSchema,
 } from './amc.schema.js';
 
 const amcService = new AmcService();
@@ -224,6 +226,73 @@ export class AmcController {
       }
       const newContract = await amcService.renewContract(id, userId);
       res.status(201).json({ success: true, data: newContract });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ==================== RESCHEDULE & CONVERT ====================
+
+  async rescheduleVisit(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { scheduleId } = req.params;
+      const input = rescheduleVisitSchema.parse(req.body);
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ success: false, error: { message: 'Unauthorized' } });
+      }
+      const result = await amcService.rescheduleVisit(scheduleId, input, userId);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async convertToServiceRequest(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { scheduleId } = req.params;
+      const input = convertToServiceRequestSchema.parse(req.body);
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ success: false, error: { message: 'Unauthorized' } });
+      }
+      const serviceRequest = await amcService.convertToServiceRequest(scheduleId, input, userId);
+      res.status(201).json({ success: true, data: serviceRequest });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async convertUpcomingSchedules(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const daysAhead = parseInt(req.query.daysAhead as string) || 7;
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ success: false, error: { message: 'Unauthorized' } });
+      }
+      const result = await amcService.convertUpcomingSchedules(id, daysAhead, userId);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getSchedulesCalendar(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { fromDate, toDate, contractId } = req.query;
+      if (!fromDate || !toDate) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'fromDate and toDate are required' }
+        });
+      }
+      const result = await amcService.getUpcomingSchedulesCalendar({
+        fromDate: fromDate as string,
+        toDate: toDate as string,
+        contractId: contractId as string,
+      });
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

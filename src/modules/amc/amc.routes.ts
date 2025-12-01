@@ -13,7 +13,10 @@ router.get('/stats', controller.getDashboardStats.bind(controller));
 
 // Schedules (global - not tied to specific contract)
 router.get('/schedules', controller.getSchedules.bind(controller));
+router.get('/schedules/calendar', controller.getSchedulesCalendar.bind(controller));
 router.patch('/schedules/:scheduleId/status', controller.updateScheduleStatus.bind(controller));
+router.post('/schedules/:scheduleId/reschedule', controller.rescheduleVisit.bind(controller));
+router.post('/schedules/:scheduleId/convert', controller.convertToServiceRequest.bind(controller));
 
 // Payments (global - not tied to specific contract)
 router.get('/payments', controller.getPayments.bind(controller));
@@ -45,5 +48,8 @@ router.post('/:id/payments/generate', controller.generatePaymentSchedule.bind(co
 
 // Contract Renewal
 router.post('/:id/renew', controller.renewContract.bind(controller));
+
+// Bulk convert upcoming schedules to service requests
+router.post('/:id/schedules/convert-upcoming', controller.convertUpcomingSchedules.bind(controller));
 
 export default router;

@@ -26,6 +26,11 @@ export class MenuService {
         href: data.href,
         sortOrder: data.sortOrder,
         isActive: data.isActive,
+        parentId: data.parentId,
+      },
+      include: {
+        parent: true,
+        children: true,
       },
     });
   }
@@ -53,7 +58,33 @@ export class MenuService {
     return prisma.menuItem.findMany({
       where: includeInactive ? {} : { isActive: true },
       orderBy: { sortOrder: 'asc' },
+      include: {
+        parent: { select: { id: true, key: true, name: true } },
+        children: {
+          orderBy: { sortOrder: 'asc' },
+          where: includeInactive ? {} : { isActive: true },
+        },
+      },
     });
+  }
+
+  async getHierarchicalMenus(includeInactive = false) {
+    // Get all top-level menus (no parent)
+    const topLevel = await prisma.menuItem.findMany({
+      where: {
+        parentId: null,
+        ...(includeInactive ? {} : { isActive: true }),
+      },
+      orderBy: { sortOrder: 'asc' },
+      include: {
+        children: {
+          where: includeInactive ? {} : { isActive: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+    });
+
+    return topLevel;
   }
 
   async updateMenuItem(id: string, data: UpdateMenuItemInput) {
@@ -151,7 +182,15 @@ export class MenuService {
           include: {
             menuItems: {
               include: {
-                menuItem: true,
+                menuItem: {
+                  include: {
+                    parent: { select: { id: true, key: true, name: true, nameAr: true, icon: true } },
+                    children: {
+                      where: { isActive: true },
+                      orderBy: { sortOrder: 'asc' },
+                    },
+                  },
+                },
               },
               orderBy: {
                 menuItem: {
@@ -174,9 +213,41 @@ export class MenuService {
     }
 
     // Return only active menu items
-    return user.role.menuItems
+    const flatMenus = user.role.menuItems
       .map((rm) => rm.menuItem)
       .filter((menu) => menu.isActive);
+
+    // Build hierarchical structure
+    const menuMap = new Map();
+    const rootMenus: any[] = [];
+
+    // First pass: create map of all menus
+    for (const menu of flatMenus) {
+      menuMap.set(menu.id, { ...menu, children: [] });
+    }
+
+    // Second pass: build tree
+    for (const menu of flatMenus) {
+      const menuWithChildren = menuMap.get(menu.id);
+      if (menu.parentId && menuMap.has(menu.parentId)) {
+        const parent = menuMap.get(menu.parentId);
+        parent.children.push(menuWithChildren);
+      } else if (!menu.parentId) {
+        rootMenus.push(menuWithChildren);
+      } else {
+        // Parent not in user's permissions, show as root
+        rootMenus.push(menuWithChildren);
+      }
+    }
+
+    // Sort children within each parent
+    for (const menu of rootMenus) {
+      if (menu.children?.length > 0) {
+        menu.children.sort((a: any, b: any) => a.sortOrder - b.sortOrder);
+      }
+    }
+
+    return rootMenus;
   }
 
   async getAllRolesWithMenus() {

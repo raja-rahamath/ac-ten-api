@@ -47,6 +47,8 @@ import menuRoutes from './modules/menus/menu.routes.js';
 import amcRoutes from './modules/amc/amc.routes.js';
 import quoteRoutes from './modules/quotes/quote.routes.js';
 import receiptRoutes from './modules/receipts/receipt.routes.js';
+import collectionRoutes from './modules/collections/collection.routes.js';
+import reportRoutes from './modules/reports/report.routes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -112,6 +114,8 @@ export function createApp(): Express {
   apiRouter.use('/amc', amcRoutes);
   apiRouter.use('/quotes', quoteRoutes);
   apiRouter.use('/receipts', receiptRoutes);
+  apiRouter.use('/collections', collectionRoutes);
+  apiRouter.use('/reports', reportRoutes);
 
   app.use(`/api/${config.apiVersion}`, apiRouter);
 

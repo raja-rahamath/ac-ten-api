@@ -11,6 +11,8 @@ import {
   ListAmcContractsQuery,
   ListSchedulesQuery,
   ListPaymentsQuery,
+  RescheduleVisitInput,
+  ConvertToServiceRequestInput,
 } from './amc.schema.js';
 import { AmcServiceFrequency, AmcPaymentTerms } from '@prisma/client';
 
@@ -727,5 +729,237 @@ export class AmcService {
     });
 
     return newContract;
+  }
+
+  // ==================== RESCHEDULE VISIT ====================
+
+  async rescheduleVisit(scheduleId: string, input: RescheduleVisitInput, userId: string) {
+    const schedule = await prisma.amcServiceSchedule.findUnique({
+      where: { id: scheduleId },
+      include: {
+        contract: { include: { customer: true } },
+        complaintType: true,
+      },
+    });
+
+    if (!schedule) {
+      throw new NotFoundError('Schedule not found');
+    }
+
+    if (schedule.status !== 'SCHEDULED' && schedule.status !== 'CONFIRMED') {
+      throw new BadRequestError('Only scheduled or confirmed visits can be rescheduled');
+    }
+
+    // Store original date for history
+    const originalDate = schedule.scheduledDate;
+    const originalTime = schedule.scheduledTime;
+
+    // Update schedule with new date and mark as rescheduled
+    const updated = await prisma.amcServiceSchedule.update({
+      where: { id: scheduleId },
+      data: {
+        scheduledDate: input.newDate,
+        scheduledTime: input.newTime || schedule.scheduledTime,
+        status: 'SCHEDULED', // Reset to scheduled
+        notes: `Rescheduled from ${originalDate.toISOString().split('T')[0]}${originalTime ? ' ' + originalTime : ''}. Reason: ${input.reason}`,
+      },
+      include: {
+        contract: { include: { customer: true } },
+        unit: { include: { building: true } },
+        property: true,
+        complaintType: true,
+      },
+    });
+
+    // TODO: Send notification to customer if input.notifyCustomer is true
+
+    return {
+      schedule: updated,
+      originalDate,
+      originalTime,
+      newDate: input.newDate,
+      newTime: input.newTime,
+      reason: input.reason,
+    };
+  }
+
+  // ==================== CONVERT TO SERVICE REQUEST ====================
+
+  async convertToServiceRequest(scheduleId: string, input: ConvertToServiceRequestInput, userId: string) {
+    const schedule = await prisma.amcServiceSchedule.findUnique({
+      where: { id: scheduleId },
+      include: {
+        contract: {
+          include: {
+            customer: true,
+          },
+        },
+        unit: {
+          include: {
+            building: {
+              include: {
+                zone: true,
+              },
+            },
+          },
+        },
+        property: {
+          include: {
+            zone: true,
+          },
+        },
+        complaintType: true,
+        serviceRequest: true,
+      },
+    });
+
+    if (!schedule) {
+      throw new NotFoundError('Schedule not found');
+    }
+
+    if (schedule.serviceRequest) {
+      throw new BadRequestError('Service request already exists for this schedule');
+    }
+
+    if (schedule.status !== 'SCHEDULED' && schedule.status !== 'CONFIRMED') {
+      throw new BadRequestError('Only scheduled or confirmed visits can be converted to service requests');
+    }
+
+    // Get zone from unit or property
+    const zoneId = schedule.unit?.building?.zoneId || schedule.property?.zoneId;
+    if (!zoneId) {
+      throw new BadRequestError('Cannot determine zone for this schedule. Please ensure the property/unit has a zone assigned.');
+    }
+
+    // Generate service request number
+    const timestamp = Date.now().toString(36).toUpperCase();
+    const random = Math.random().toString(36).substring(2, 4).toUpperCase();
+    const requestNo = `SR-AMC-${timestamp}${random}`;
+
+    // Create service request
+    const serviceRequest = await prisma.serviceRequest.create({
+      data: {
+        requestNo,
+        customerId: schedule.contract.customerId,
+        propertyId: schedule.propertyId,
+        unitId: schedule.unitId,
+        zoneId,
+        complaintTypeId: schedule.complaintTypeId,
+        requestType: 'AMC',
+        priority: input.priority || 'MEDIUM',
+        status: 'NEW',
+        source: 'BACK_OFFICE',
+        title: `AMC Service: ${schedule.complaintType.name}`,
+        description: `Scheduled AMC service visit for contract ${schedule.contract.contractNo}`,
+        internalNotes: input.notes,
+        assignedToId: input.assignedToId,
+      },
+      include: {
+        customer: true,
+        property: true,
+        unit: true,
+        zone: true,
+        complaintType: true,
+        assignedTo: { include: { user: true } },
+      },
+    });
+
+    // Link service request to schedule and update status
+    await prisma.amcServiceSchedule.update({
+      where: { id: scheduleId },
+      data: {
+        serviceRequestId: serviceRequest.id,
+        status: 'IN_PROGRESS',
+      },
+    });
+
+    return serviceRequest;
+  }
+
+  // ==================== BULK CONVERT UPCOMING SCHEDULES ====================
+
+  async convertUpcomingSchedules(contractId: string, daysAhead: number = 7, userId: string) {
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + daysAhead);
+
+    const schedules = await prisma.amcServiceSchedule.findMany({
+      where: {
+        contractId,
+        status: 'SCHEDULED',
+        serviceRequestId: null,
+        scheduledDate: {
+          gte: new Date(),
+          lte: futureDate,
+        },
+      },
+    });
+
+    const results = [];
+    for (const schedule of schedules) {
+      try {
+        const sr = await this.convertToServiceRequest(schedule.id, {}, userId);
+        results.push({ scheduleId: schedule.id, success: true, serviceRequestId: sr.id });
+      } catch (error: any) {
+        results.push({ scheduleId: schedule.id, success: false, error: error.message });
+      }
+    }
+
+    return {
+      total: schedules.length,
+      converted: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length,
+      results,
+    };
+  }
+
+  // ==================== GET UPCOMING SCHEDULES FOR CALENDAR ====================
+
+  async getUpcomingSchedulesCalendar(query: { fromDate: string; toDate: string; contractId?: string }) {
+    const where: any = {
+      scheduledDate: {
+        gte: new Date(query.fromDate),
+        lte: new Date(query.toDate),
+      },
+    };
+
+    if (query.contractId) {
+      where.contractId = query.contractId;
+    }
+
+    const schedules = await prisma.amcServiceSchedule.findMany({
+      where,
+      orderBy: { scheduledDate: 'asc' },
+      include: {
+        contract: {
+          include: {
+            customer: { select: { id: true, firstName: true, lastName: true, orgName: true } },
+          },
+        },
+        unit: {
+          include: {
+            building: { select: { id: true, buildingNumber: true, name: true } },
+          },
+        },
+        property: { select: { id: true, name: true, propertyNo: true } },
+        complaintType: { select: { id: true, name: true, nameAr: true } },
+        serviceRequest: { select: { id: true, requestNo: true, status: true } },
+      },
+    });
+
+    // Group by date for calendar view
+    const grouped: Record<string, typeof schedules> = {};
+    for (const schedule of schedules) {
+      const dateKey = schedule.scheduledDate.toISOString().split('T')[0];
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = [];
+      }
+      grouped[dateKey].push(schedule);
+    }
+
+    return {
+      schedules,
+      byDate: grouped,
+      total: schedules.length,
+    };
   }
 }

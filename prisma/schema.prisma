@@ -103,9 +103,15 @@ model MenuItem {
   name        String   // Display name
   nameAr      String?  @map("name_ar")
   icon        String?  // Icon name
-  href        String   // Route path
+  href        String?  // Route path (optional for parent menus)
   sortOrder   Int      @default(0) @map("sort_order")
   isActive    Boolean  @default(true) @map("is_active")
+
+  // Hierarchical structure
+  parentId    String?  @map("parent_id")
+  parent      MenuItem?  @relation("MenuHierarchy", fields: [parentId], references: [id])
+  children    MenuItem[] @relation("MenuHierarchy")
+
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

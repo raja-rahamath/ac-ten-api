@@ -7,9 +7,10 @@ export const createMenuItemSchema = z.object({
     name: z.string().min(1).max(100),
     nameAr: z.string().max(100).optional(),
     icon: z.string().max(50).optional(),
-    href: z.string().min(1).max(200),
+    href: z.string().max(200).optional(), // Optional for parent menus
     sortOrder: z.number().int().default(0),
     isActive: z.boolean().default(true),
+    parentId: z.string().optional(), // For hierarchical menus
   }),
 });
 
@@ -21,9 +22,10 @@ export const updateMenuItemSchema = z.object({
     name: z.string().min(1).max(100).optional(),
     nameAr: z.string().max(100).optional().nullable(),
     icon: z.string().max(50).optional().nullable(),
-    href: z.string().min(1).max(200).optional(),
+    href: z.string().max(200).optional().nullable(),
     sortOrder: z.number().int().optional(),
     isActive: z.boolean().optional(),
+    parentId: z.string().optional().nullable(),
   }),
 });
 

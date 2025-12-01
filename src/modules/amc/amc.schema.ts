@@ -120,6 +120,23 @@ export const recordPaymentSchema = z.object({
   notes: z.string().optional(),
 });
 
+// Reschedule Visit
+export const rescheduleVisitSchema = z.object({
+  newDate: z.string().transform((val) => new Date(val)),
+  newTime: z.string().optional(), // e.g., "09:00-12:00"
+  reason: z.string().min(1, 'Reason is required'),
+  notifyCustomer: z.boolean().default(true),
+});
+
+// Convert Schedule to Service Request
+export const convertToServiceRequestSchema = z.object({
+  assignedToId: z.string().optional(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'EMERGENCY']).default('MEDIUM'),
+  scheduledDate: z.string().transform((val) => new Date(val)).optional(),
+  scheduledTime: z.string().optional(),
+  notes: z.string().optional(),
+});
+
 // List Query params
 export const listAmcContractsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -157,3 +174,5 @@ export type RecordPaymentInput = z.infer<typeof recordPaymentSchema>;
 export type ListAmcContractsQuery = z.infer<typeof listAmcContractsQuerySchema>;
 export type ListSchedulesQuery = z.infer<typeof listSchedulesQuerySchema>;
 export type ListPaymentsQuery = z.infer<typeof listPaymentsQuerySchema>;
+export type RescheduleVisitInput = z.infer<typeof rescheduleVisitSchema>;
+export type ConvertToServiceRequestInput = z.infer<typeof convertToServiceRequestSchema>;
