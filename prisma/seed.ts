@@ -305,11 +305,11 @@ async function main() {
   console.log(`✅ Created demo company: ${demoCompany.name}`);
 
   // Create a demo admin user
-  const hashedPassword = await bcrypt.hash('Admin123!', 10);
+  const hashedPassword = await bcrypt.hash('Admin123', 10);
 
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@fixitbh.com' },
-    update: {},
+    update: { password: hashedPassword },
     create: {
       email: 'admin@fixitbh.com',
       password: hashedPassword,
@@ -405,32 +405,136 @@ async function main() {
 
   console.log(`✅ Created ${propertyTypes.length} property types`);
 
-  // Create Asset Types
+  // Create Asset Types with categories and icons
   const assetTypes = await Promise.all([
+    // HVAC
     prisma.assetType.upsert({
       where: { name: 'Split AC' },
-      update: {},
-      create: { name: 'Split AC', nameAr: 'مكيف سبليت' },
+      update: { category: 'HVAC', icon: 'AirVent', defaultServiceIntervalDays: 90, defaultLifeYears: 10 },
+      create: { name: 'Split AC', nameAr: 'مكيف سبليت', category: 'HVAC', icon: 'AirVent', defaultServiceIntervalDays: 90, defaultLifeYears: 10 },
     }),
     prisma.assetType.upsert({
       where: { name: 'Central AC' },
-      update: {},
-      create: { name: 'Central AC', nameAr: 'مكيف مركزي' },
+      update: { category: 'HVAC', icon: 'AirVent', defaultServiceIntervalDays: 90, defaultLifeYears: 15 },
+      create: { name: 'Central AC', nameAr: 'مكيف مركزي', category: 'HVAC', icon: 'AirVent', defaultServiceIntervalDays: 90, defaultLifeYears: 15 },
     }),
+    prisma.assetType.upsert({
+      where: { name: 'Window AC' },
+      update: { category: 'HVAC', icon: 'AirVent', defaultServiceIntervalDays: 90, defaultLifeYears: 8 },
+      create: { name: 'Window AC', nameAr: 'مكيف شباك', category: 'HVAC', icon: 'AirVent', defaultServiceIntervalDays: 90, defaultLifeYears: 8 },
+    }),
+    // PLUMBING
     prisma.assetType.upsert({
       where: { name: 'Water Heater' },
-      update: {},
-      create: { name: 'Water Heater', nameAr: 'سخان ماء' },
+      update: { category: 'PLUMBING', icon: 'Droplets', defaultServiceIntervalDays: 365, defaultLifeYears: 10 },
+      create: { name: 'Water Heater', nameAr: 'سخان ماء', category: 'PLUMBING', icon: 'Droplets', defaultServiceIntervalDays: 365, defaultLifeYears: 10 },
     }),
     prisma.assetType.upsert({
+      where: { name: 'Water Pump' },
+      update: { category: 'PLUMBING', icon: 'Droplets', defaultServiceIntervalDays: 180, defaultLifeYears: 8 },
+      create: { name: 'Water Pump', nameAr: 'مضخة مياه', category: 'PLUMBING', icon: 'Droplets', defaultServiceIntervalDays: 180, defaultLifeYears: 8 },
+    }),
+    prisma.assetType.upsert({
+      where: { name: 'Water Tank' },
+      update: { category: 'PLUMBING', icon: 'Container', defaultServiceIntervalDays: 365, defaultLifeYears: 20 },
+      create: { name: 'Water Tank', nameAr: 'خزان مياه', category: 'PLUMBING', icon: 'Container', defaultServiceIntervalDays: 365, defaultLifeYears: 20 },
+    }),
+    // ELECTRICAL
+    prisma.assetType.upsert({
+      where: { name: 'Electrical Panel' },
+      update: { category: 'ELECTRICAL', icon: 'Zap', defaultServiceIntervalDays: 365, defaultLifeYears: 25 },
+      create: { name: 'Electrical Panel', nameAr: 'لوحة كهربائية', category: 'ELECTRICAL', icon: 'Zap', defaultServiceIntervalDays: 365, defaultLifeYears: 25 },
+    }),
+    prisma.assetType.upsert({
+      where: { name: 'Generator' },
+      update: { category: 'ELECTRICAL', icon: 'Zap', defaultServiceIntervalDays: 180, defaultLifeYears: 15 },
+      create: { name: 'Generator', nameAr: 'مولد كهربائي', category: 'ELECTRICAL', icon: 'Zap', defaultServiceIntervalDays: 180, defaultLifeYears: 15 },
+    }),
+    // APPLIANCES
+    prisma.assetType.upsert({
       where: { name: 'Washing Machine' },
-      update: {},
-      create: { name: 'Washing Machine', nameAr: 'غسالة ملابس' },
+      update: { category: 'APPLIANCES', icon: 'WashingMachine', defaultServiceIntervalDays: 365, defaultLifeYears: 8 },
+      create: { name: 'Washing Machine', nameAr: 'غسالة ملابس', category: 'APPLIANCES', icon: 'WashingMachine', defaultServiceIntervalDays: 365, defaultLifeYears: 8 },
     }),
     prisma.assetType.upsert({
       where: { name: 'Refrigerator' },
-      update: {},
-      create: { name: 'Refrigerator', nameAr: 'ثلاجة' },
+      update: { category: 'APPLIANCES', icon: 'Refrigerator', defaultServiceIntervalDays: 365, defaultLifeYears: 12 },
+      create: { name: 'Refrigerator', nameAr: 'ثلاجة', category: 'APPLIANCES', icon: 'Refrigerator', defaultServiceIntervalDays: 365, defaultLifeYears: 12 },
+    }),
+    prisma.assetType.upsert({
+      where: { name: 'Dishwasher' },
+      update: { category: 'APPLIANCES', icon: 'Utensils', defaultServiceIntervalDays: 365, defaultLifeYears: 10 },
+      create: { name: 'Dishwasher', nameAr: 'غسالة صحون', category: 'APPLIANCES', icon: 'Utensils', defaultServiceIntervalDays: 365, defaultLifeYears: 10 },
+    }),
+    prisma.assetType.upsert({
+      where: { name: 'Oven' },
+      update: { category: 'APPLIANCES', icon: 'ChefHat', defaultServiceIntervalDays: 365, defaultLifeYears: 15 },
+      create: { name: 'Oven', nameAr: 'فرن', category: 'APPLIANCES', icon: 'ChefHat', defaultServiceIntervalDays: 365, defaultLifeYears: 15 },
+    }),
+    prisma.assetType.upsert({
+      where: { name: 'Cooktop' },
+      update: { category: 'APPLIANCES', icon: 'Flame', defaultServiceIntervalDays: 365, defaultLifeYears: 12 },
+      create: { name: 'Cooktop', nameAr: 'بوتاجاز', category: 'APPLIANCES', icon: 'Flame', defaultServiceIntervalDays: 365, defaultLifeYears: 12 },
+    }),
+    prisma.assetType.upsert({
+      where: { name: 'Dryer' },
+      update: { category: 'APPLIANCES', icon: 'Wind', defaultServiceIntervalDays: 365, defaultLifeYears: 10 },
+      create: { name: 'Dryer', nameAr: 'مجفف ملابس', category: 'APPLIANCES', icon: 'Wind', defaultServiceIntervalDays: 365, defaultLifeYears: 10 },
+    }),
+    // SECURITY
+    prisma.assetType.upsert({
+      where: { name: 'CCTV Camera' },
+      update: { category: 'SECURITY', icon: 'Camera', defaultServiceIntervalDays: 180, defaultLifeYears: 5 },
+      create: { name: 'CCTV Camera', nameAr: 'كاميرا مراقبة', category: 'SECURITY', icon: 'Camera', defaultServiceIntervalDays: 180, defaultLifeYears: 5 },
+    }),
+    prisma.assetType.upsert({
+      where: { name: 'Access Control' },
+      update: { category: 'SECURITY', icon: 'KeyRound', defaultServiceIntervalDays: 180, defaultLifeYears: 8 },
+      create: { name: 'Access Control', nameAr: 'نظام التحكم بالدخول', category: 'SECURITY', icon: 'KeyRound', defaultServiceIntervalDays: 180, defaultLifeYears: 8 },
+    }),
+    prisma.assetType.upsert({
+      where: { name: 'Intercom' },
+      update: { category: 'SECURITY', icon: 'Phone', defaultServiceIntervalDays: 365, defaultLifeYears: 10 },
+      create: { name: 'Intercom', nameAr: 'انتركم', category: 'SECURITY', icon: 'Phone', defaultServiceIntervalDays: 365, defaultLifeYears: 10 },
+    }),
+    // FIRE_SAFETY
+    prisma.assetType.upsert({
+      where: { name: 'Fire Extinguisher' },
+      update: { category: 'FIRE_SAFETY', icon: 'FireExtinguisher', defaultServiceIntervalDays: 365, defaultLifeYears: 10 },
+      create: { name: 'Fire Extinguisher', nameAr: 'طفاية حريق', category: 'FIRE_SAFETY', icon: 'FireExtinguisher', defaultServiceIntervalDays: 365, defaultLifeYears: 10 },
+    }),
+    prisma.assetType.upsert({
+      where: { name: 'Smoke Detector' },
+      update: { category: 'FIRE_SAFETY', icon: 'AlertTriangle', defaultServiceIntervalDays: 365, defaultLifeYears: 10 },
+      create: { name: 'Smoke Detector', nameAr: 'كاشف دخان', category: 'FIRE_SAFETY', icon: 'AlertTriangle', defaultServiceIntervalDays: 365, defaultLifeYears: 10 },
+    }),
+    // ELEVATOR
+    prisma.assetType.upsert({
+      where: { name: 'Passenger Elevator' },
+      update: { category: 'ELEVATOR', icon: 'ArrowUpDown', defaultServiceIntervalDays: 30, defaultLifeYears: 20 },
+      create: { name: 'Passenger Elevator', nameAr: 'مصعد ركاب', category: 'ELEVATOR', icon: 'ArrowUpDown', defaultServiceIntervalDays: 30, defaultLifeYears: 20 },
+    }),
+    // FURNITURE
+    prisma.assetType.upsert({
+      where: { name: 'Sofa' },
+      update: { category: 'FURNITURE', icon: 'Sofa', defaultLifeYears: 10 },
+      create: { name: 'Sofa', nameAr: 'كنبة', category: 'FURNITURE', icon: 'Sofa', defaultLifeYears: 10 },
+    }),
+    prisma.assetType.upsert({
+      where: { name: 'Bed' },
+      update: { category: 'FURNITURE', icon: 'Bed', defaultLifeYears: 15 },
+      create: { name: 'Bed', nameAr: 'سرير', category: 'FURNITURE', icon: 'Bed', defaultLifeYears: 15 },
+    }),
+    prisma.assetType.upsert({
+      where: { name: 'Wardrobe' },
+      update: { category: 'FURNITURE', icon: 'Archive', defaultLifeYears: 20 },
+      create: { name: 'Wardrobe', nameAr: 'خزانة ملابس', category: 'FURNITURE', icon: 'Archive', defaultLifeYears: 20 },
+    }),
+    // ENTERTAINMENT
+    prisma.assetType.upsert({
+      where: { name: 'Television' },
+      update: { category: 'ENTERTAINMENT', icon: 'Tv', defaultLifeYears: 7 },
+      create: { name: 'Television', nameAr: 'تلفزيون', category: 'ENTERTAINMENT', icon: 'Tv', defaultLifeYears: 7 },
     }),
   ]);
 
@@ -642,10 +746,367 @@ async function main() {
     console.log('✅ Created demo service request');
   }
 
+  // Create Leave Types
+  const leaveTypes = await Promise.all([
+    prisma.leaveType.upsert({
+      where: { name: 'Annual Leave' },
+      update: {},
+      create: {
+        name: 'Annual Leave',
+        nameAr: 'إجازة سنوية',
+        description: 'Standard annual vacation leave',
+        defaultDays: 21,
+        isPaid: true,
+        requiresApproval: true,
+        maxConsecutiveDays: 14,
+      },
+    }),
+    prisma.leaveType.upsert({
+      where: { name: 'Sick Leave' },
+      update: {},
+      create: {
+        name: 'Sick Leave',
+        nameAr: 'إجازة مرضية',
+        description: 'Medical or health-related leave',
+        defaultDays: 15,
+        isPaid: true,
+        requiresApproval: true,
+        maxConsecutiveDays: 7,
+      },
+    }),
+    prisma.leaveType.upsert({
+      where: { name: 'Emergency Leave' },
+      update: {},
+      create: {
+        name: 'Emergency Leave',
+        nameAr: 'إجازة طارئة',
+        description: 'Leave for urgent personal matters',
+        defaultDays: 3,
+        isPaid: true,
+        requiresApproval: false,
+        maxConsecutiveDays: 3,
+      },
+    }),
+    prisma.leaveType.upsert({
+      where: { name: 'Maternity Leave' },
+      update: {},
+      create: {
+        name: 'Maternity Leave',
+        nameAr: 'إجازة أمومة',
+        description: 'Leave for expecting mothers',
+        defaultDays: 60,
+        isPaid: true,
+        requiresApproval: true,
+        maxConsecutiveDays: 60,
+      },
+    }),
+    prisma.leaveType.upsert({
+      where: { name: 'Paternity Leave' },
+      update: {},
+      create: {
+        name: 'Paternity Leave',
+        nameAr: 'إجازة أبوة',
+        description: 'Leave for new fathers',
+        defaultDays: 3,
+        isPaid: true,
+        requiresApproval: true,
+        maxConsecutiveDays: 3,
+      },
+    }),
+    prisma.leaveType.upsert({
+      where: { name: 'Unpaid Leave' },
+      update: {},
+      create: {
+        name: 'Unpaid Leave',
+        nameAr: 'إجازة بدون راتب',
+        description: 'Leave without pay',
+        defaultDays: 0,
+        isPaid: false,
+        requiresApproval: true,
+        maxConsecutiveDays: 30,
+      },
+    }),
+    prisma.leaveType.upsert({
+      where: { name: 'Hajj Leave' },
+      update: {},
+      create: {
+        name: 'Hajj Leave',
+        nameAr: 'إجازة حج',
+        description: 'Leave for Hajj pilgrimage (once in employment)',
+        defaultDays: 15,
+        isPaid: true,
+        requiresApproval: true,
+        maxConsecutiveDays: 15,
+      },
+    }),
+    prisma.leaveType.upsert({
+      where: { name: 'Bereavement Leave' },
+      update: {},
+      create: {
+        name: 'Bereavement Leave',
+        nameAr: 'إجازة عزاء',
+        description: 'Leave for death of a family member',
+        defaultDays: 3,
+        isPaid: true,
+        requiresApproval: false,
+        maxConsecutiveDays: 7,
+      },
+    }),
+  ]);
+
+  console.log(`✅ Created ${leaveTypes.length} leave types`);
+
+  // Create Menu Items
+  const menuItems = await Promise.all([
+    prisma.menuItem.upsert({
+      where: { key: 'dashboard' },
+      update: {},
+      create: {
+        key: 'dashboard',
+        name: 'Dashboard',
+        nameAr: 'لوحة التحكم',
+        icon: 'dashboard',
+        href: '/dashboard',
+        sortOrder: 1,
+      },
+    }),
+    prisma.menuItem.upsert({
+      where: { key: 'requests' },
+      update: {},
+      create: {
+        key: 'requests',
+        name: 'Service Requests',
+        nameAr: 'طلبات الخدمة',
+        icon: 'requests',
+        href: '/requests',
+        sortOrder: 2,
+      },
+    }),
+    prisma.menuItem.upsert({
+      where: { key: 'customers' },
+      update: {},
+      create: {
+        key: 'customers',
+        name: 'Customers',
+        nameAr: 'العملاء',
+        icon: 'customers',
+        href: '/customers',
+        sortOrder: 3,
+      },
+    }),
+    prisma.menuItem.upsert({
+      where: { key: 'properties' },
+      update: {},
+      create: {
+        key: 'properties',
+        name: 'Properties',
+        nameAr: 'العقارات',
+        icon: 'properties',
+        href: '/properties',
+        sortOrder: 4,
+      },
+    }),
+    prisma.menuItem.upsert({
+      where: { key: 'amc' },
+      update: {},
+      create: {
+        key: 'amc',
+        name: 'AMC Contracts',
+        nameAr: 'عقود الصيانة',
+        icon: 'amc',
+        href: '/amc',
+        sortOrder: 5,
+      },
+    }),
+    prisma.menuItem.upsert({
+      where: { key: 'employees' },
+      update: {},
+      create: {
+        key: 'employees',
+        name: 'Employees',
+        nameAr: 'الموظفون',
+        icon: 'employees',
+        href: '/employees',
+        sortOrder: 6,
+      },
+    }),
+    prisma.menuItem.upsert({
+      where: { key: 'leaves' },
+      update: {},
+      create: {
+        key: 'leaves',
+        name: 'Leave Management',
+        nameAr: 'إدارة الإجازات',
+        icon: 'calendar',
+        href: '/leaves',
+        sortOrder: 7,
+      },
+    }),
+    prisma.menuItem.upsert({
+      where: { key: 'invoices' },
+      update: {},
+      create: {
+        key: 'invoices',
+        name: 'Invoices',
+        nameAr: 'الفواتير',
+        icon: 'invoices',
+        href: '/invoices',
+        sortOrder: 8,
+      },
+    }),
+    prisma.menuItem.upsert({
+      where: { key: 'quotes' },
+      update: {},
+      create: {
+        key: 'quotes',
+        name: 'Quotes',
+        nameAr: 'عروض الأسعار',
+        icon: 'quotes',
+        href: '/quotes',
+        sortOrder: 9,
+      },
+    }),
+    prisma.menuItem.upsert({
+      where: { key: 'receipts' },
+      update: {},
+      create: {
+        key: 'receipts',
+        name: 'Receipts',
+        nameAr: 'الإيصالات',
+        icon: 'receipts',
+        href: '/receipts',
+        sortOrder: 10,
+      },
+    }),
+    prisma.menuItem.upsert({
+      where: { key: 'email-templates' },
+      update: {},
+      create: {
+        key: 'email-templates',
+        name: 'Email Templates',
+        nameAr: 'قوالب البريد',
+        icon: 'email',
+        href: '/email-templates',
+        sortOrder: 11,
+      },
+    }),
+    prisma.menuItem.upsert({
+      where: { key: 'reports' },
+      update: {},
+      create: {
+        key: 'reports',
+        name: 'Reports',
+        nameAr: 'التقارير',
+        icon: 'reports',
+        href: '/reports',
+        sortOrder: 12,
+      },
+    }),
+    prisma.menuItem.upsert({
+      where: { key: 'settings' },
+      update: {},
+      create: {
+        key: 'settings',
+        name: 'Settings',
+        nameAr: 'الإعدادات',
+        icon: 'settings',
+        href: '/settings',
+        sortOrder: 13,
+      },
+    }),
+  ]);
+
+  console.log(`✅ Created ${menuItems.length} menu items`);
+
+  // Assign all menus to admin role
+  const allMenuItems = await prisma.menuItem.findMany();
+  for (const menu of allMenuItems) {
+    await prisma.roleMenuPermission.upsert({
+      where: {
+        roleId_menuItemId: {
+          roleId: adminRole.id,
+          menuItemId: menu.id,
+        },
+      },
+      update: {},
+      create: {
+        roleId: adminRole.id,
+        menuItemId: menu.id,
+      },
+    });
+  }
+  console.log('✅ Assigned all menus to admin role');
+
+  // Assign menus to manager role (all except settings)
+  const managerMenuKeys = ['dashboard', 'requests', 'customers', 'properties', 'amc', 'employees', 'leaves', 'invoices', 'reports'];
+  for (const key of managerMenuKeys) {
+    const menu = allMenuItems.find(m => m.key === key);
+    if (menu) {
+      await prisma.roleMenuPermission.upsert({
+        where: {
+          roleId_menuItemId: {
+            roleId: managerRole.id,
+            menuItemId: menu.id,
+          },
+        },
+        update: {},
+        create: {
+          roleId: managerRole.id,
+          menuItemId: menu.id,
+        },
+      });
+    }
+  }
+  console.log('✅ Assigned menus to manager role');
+
+  // Assign only Service Requests menu to technician role
+  const technicianMenuKeys = ['requests'];
+  for (const key of technicianMenuKeys) {
+    const menu = allMenuItems.find(m => m.key === key);
+    if (menu) {
+      await prisma.roleMenuPermission.upsert({
+        where: {
+          roleId_menuItemId: {
+            roleId: technicianRole.id,
+            menuItemId: menu.id,
+          },
+        },
+        update: {},
+        create: {
+          roleId: technicianRole.id,
+          menuItemId: menu.id,
+        },
+      });
+    }
+  }
+  console.log('✅ Assigned Service Requests menu to technician role (zone-specific access)');
+
+  // Assign menus to receptionist role
+  const receptionistMenuKeys = ['dashboard', 'requests', 'customers', 'invoices'];
+  for (const key of receptionistMenuKeys) {
+    const menu = allMenuItems.find(m => m.key === key);
+    if (menu) {
+      await prisma.roleMenuPermission.upsert({
+        where: {
+          roleId_menuItemId: {
+            roleId: receptionistRole.id,
+            menuItemId: menu.id,
+          },
+        },
+        update: {},
+        create: {
+          roleId: receptionistRole.id,
+          menuItemId: menu.id,
+        },
+      });
+    }
+  }
+  console.log('✅ Assigned menus to receptionist role');
+
   console.log('\n🎉 Database seeding completed successfully!');
   console.log('\n📝 Demo credentials:');
   console.log('   Email: admin@fixitbh.com');
-  console.log('   Password: Admin123!');
+  console.log('   Password: Admin123');
   console.log('   Company: FixIt Pro WLL');
 }
 

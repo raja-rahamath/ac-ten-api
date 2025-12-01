@@ -64,4 +64,49 @@ export class EmployeeController {
       next(error);
     }
   }
+
+  async exportExcel(req: Request, res: Response, next: NextFunction) {
+    try {
+      const buffer = await employeeService.exportToExcel();
+      const filename = `employees_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(Buffer.from(buffer));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getImportTemplate(req: Request, res: Response, next: NextFunction) {
+    try {
+      const buffer = await employeeService.getImportTemplate();
+      const filename = 'employee_import_template.xlsx';
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(Buffer.from(buffer));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async importExcel(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'No file uploaded' },
+        });
+      }
+
+      const result = await employeeService.importFromExcel(req.file.buffer);
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

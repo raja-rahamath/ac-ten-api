@@ -12,56 +12,73 @@ datasource db {
 // ==================== USER & AUTH ====================
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  password      String
-  firstName     String    @map("first_name")
-  lastName      String    @map("last_name")
-  phone         String?
-  avatar        String?
-  isActive      Boolean   @default(true) @map("is_active")
-  isVerified    Boolean   @default(false) @map("is_verified")
-  lastLoginAt   DateTime? @map("last_login_at")
-  roleId        String?   @map("role_id")
-  role          Role?     @relation(fields: [roleId], references: [id])
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  id          String    @id @default(cuid())
+  email       String    @unique
+  password    String
+  firstName   String    @map("first_name")
+  lastName    String    @map("last_name")
+  phone       String?
+  avatar      String?
+  isActive    Boolean   @default(true) @map("is_active")
+  isVerified  Boolean   @default(false) @map("is_verified")
+  lastLoginAt DateTime? @map("last_login_at")
+  roleId      String?   @map("role_id")
+  role        Role?     @relation(fields: [roleId], references: [id])
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  employee      Employee?
-  customer      Customer?
-  auditLogs     AuditLog[]
+  employee  Employee?
+  customer  Customer?
+  auditLogs AuditLog[]
+
+  // AMC Relations
+  amcContractsCreated   AmcContract[]        @relation("AmcCreatedBy")
+  amcContractsApproved  AmcContract[]        @relation("AmcApprovedBy")
+  amcContractsCancelled AmcContract[]        @relation("AmcCancelledBy")
+  amcSchedulesCompleted AmcServiceSchedule[] @relation("AmcScheduleCompletedBy")
+
+  // Quote Relations
+  quotesCreated         Quote[]              @relation("QuoteCreatedBy")
+  quotesSent            Quote[]              @relation("QuoteSentBy")
+  quotesApproved        Quote[]              @relation("QuoteApprovedBy")
+  quoteActivities       QuoteActivity[]      @relation("QuoteActivityBy")
+
+  // Receipt Relations
+  receiptsCreated       Receipt[]            @relation("ReceiptCreatedBy")
+  receiptsVoided        Receipt[]            @relation("ReceiptVoidedBy")
 
   @@map("users")
   @@schema("fixitbh_ac")
 }
 
 model Role {
-  id          String       @id @default(cuid())
-  name        String       @unique
-  displayName String       @map("display_name")
+  id          String   @id @default(cuid())
+  name        String   @unique
+  displayName String   @map("display_name")
   description String?
-  isSystem    Boolean      @default(false) @map("is_system")
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
   users       User[]
   permissions RolePermission[]
+  menuItems   RoleMenuPermission[]
 
   @@map("roles")
   @@schema("fixitbh_ac")
 }
 
 model Permission {
-  id          String           @id @default(cuid())
+  id          String   @id @default(cuid())
   resource    String
   action      String
   description String?
-  createdAt   DateTime         @default(now()) @map("created_at")
+  createdAt   DateTime @default(now()) @map("created_at")
 
   // Relations
-  roles       RolePermission[]
+  roles RolePermission[]
 
   @@unique([resource, action])
   @@map("permissions")
@@ -79,39 +96,72 @@ model RolePermission {
   @@schema("fixitbh_ac")
 }
 
-// ==================== ORGANIZATION ====================
-
-model Company {
+// Menu items that can be assigned to roles
+model MenuItem {
   id          String   @id @default(cuid())
-  name        String
+  key         String   @unique // e.g., "dashboard", "requests", "customers"
+  name        String   // Display name
   nameAr      String?  @map("name_ar")
-  logo        String?
-  email       String?
-  phone       String?
-  website     String?
-  address     String?
+  icon        String?  // Icon name
+  href        String   // Route path
+  sortOrder   Int      @default(0) @map("sort_order")
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  divisions   Division[]
-  employees   Employee[]
+  roleMenus RoleMenuPermission[]
+
+  @@map("menu_items")
+  @@schema("fixitbh_ac")
+}
+
+// Role-Menu junction table
+model RoleMenuPermission {
+  roleId     String   @map("role_id")
+  menuItemId String   @map("menu_item_id")
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@id([roleId, menuItemId])
+  @@map("role_menu_permissions")
+  @@schema("fixitbh_ac")
+}
+
+// ==================== ORGANIZATION ====================
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  nameAr    String?  @map("name_ar")
+  logo      String?
+  email     String?
+  phone     String?
+  website   String?
+  address   String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  divisions Division[]
+  employees Employee[]
 
   @@map("companies")
   @@schema("fixitbh_ac")
 }
 
 model Division {
-  id          String       @id @default(cuid())
-  companyId   String       @map("company_id")
-  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  name        String
-  nameAr      String?      @map("name_ar")
-  code        String?
-  isActive    Boolean      @default(true) @map("is_active")
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  companyId String   @map("company_id")
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name      String
+  nameAr    String?  @map("name_ar")
+  code      String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
   departments Department[]
@@ -122,19 +172,19 @@ model Division {
 }
 
 model Department {
-  id          String    @id @default(cuid())
-  divisionId  String    @map("division_id")
-  division    Division  @relation(fields: [divisionId], references: [id], onDelete: Cascade)
-  name        String
-  nameAr      String?   @map("name_ar")
-  code        String?
-  isActive    Boolean   @default(true) @map("is_active")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id         String   @id @default(cuid())
+  divisionId String   @map("division_id")
+  division   Division @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+  name       String
+  nameAr     String?  @map("name_ar")
+  code       String?
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   // Relations
-  sections    Section[]
-  employees   Employee[]
+  sections  Section[]
+  employees Employee[]
 
   @@map("departments")
   @@schema("fixitbh_ac")
@@ -152,7 +202,7 @@ model Section {
   updatedAt    DateTime   @updatedAt @map("updated_at")
 
   // Relations
-  employees    Employee[]
+  employees Employee[]
 
   @@map("sections")
   @@schema("fixitbh_ac")
@@ -161,57 +211,62 @@ model Section {
 // ==================== EMPLOYEE ====================
 
 model Employee {
-  id              String    @id @default(cuid())
-  userId          String?   @unique @map("user_id")
-  user            User?     @relation(fields: [userId], references: [id])
-  employeeNo      String    @unique @map("employee_no")
-  firstName       String    @map("first_name")
-  lastName        String    @map("last_name")
-  firstNameAr     String?   @map("first_name_ar")
-  lastNameAr      String?   @map("last_name_ar")
-  email           String    @unique
+  id              String      @id @default(cuid())
+  userId          String?     @unique @map("user_id")
+  user            User?       @relation(fields: [userId], references: [id])
+  employeeNo      String      @unique @map("employee_no")
+  firstName       String      @map("first_name")
+  lastName        String      @map("last_name")
+  firstNameAr     String?     @map("first_name_ar")
+  lastNameAr      String?     @map("last_name_ar")
+  email           String      @unique
   phone           String?
-  nationalId      String?   @map("national_id")
-  dateOfBirth     DateTime? @map("date_of_birth")
-  hireDate        DateTime? @map("hire_date")
-  jobTitleId      String?   @map("job_title_id")
-  jobTitle        JobTitle? @relation(fields: [jobTitleId], references: [id])
-  companyId       String?   @map("company_id")
-  company         Company?  @relation(fields: [companyId], references: [id])
-  divisionId      String?   @map("division_id")
-  division        Division? @relation(fields: [divisionId], references: [id])
-  departmentId    String?   @map("department_id")
+  nationalId      String?     @map("national_id")
+  dateOfBirth     DateTime?   @map("date_of_birth")
+  hireDate        DateTime?   @map("hire_date")
+  jobTitleId      String?     @map("job_title_id")
+  jobTitle        JobTitle?   @relation(fields: [jobTitleId], references: [id])
+  companyId       String?     @map("company_id")
+  company         Company?    @relation(fields: [companyId], references: [id])
+  divisionId      String?     @map("division_id")
+  division        Division?   @relation(fields: [divisionId], references: [id])
+  departmentId    String?     @map("department_id")
   department      Department? @relation(fields: [departmentId], references: [id])
-  sectionId       String?   @map("section_id")
-  section         Section?  @relation(fields: [sectionId], references: [id])
-  managerId       String?   @map("manager_id")
-  manager         Employee? @relation("EmployeeManager", fields: [managerId], references: [id])
-  subordinates    Employee[] @relation("EmployeeManager")
-  hasSystemAccess Boolean   @default(false) @map("has_system_access")
-  isActive        Boolean   @default(true) @map("is_active")
-  lastLatitude    Float?    @map("last_latitude")
-  lastLongitude   Float?    @map("last_longitude")
-  lastLocationAt  DateTime? @map("last_location_at")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  sectionId       String?     @map("section_id")
+  section         Section?    @relation(fields: [sectionId], references: [id])
+  managerId       String?     @map("manager_id")
+  manager         Employee?   @relation("EmployeeManager", fields: [managerId], references: [id])
+  subordinates    Employee[]  @relation("EmployeeManager")
+  hasSystemAccess Boolean     @default(false) @map("has_system_access")
+  isActive        Boolean     @default(true) @map("is_active")
+  lastLatitude    Float?      @map("last_latitude")
+  lastLongitude   Float?      @map("last_longitude")
+  lastLocationAt  DateTime?   @map("last_location_at")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
 
   // Relations
-  zoneAssignments     EmployeeZone[]
-  serviceRequests     ServiceRequest[] @relation("AssignedEmployee")
-  scheduleAssignments ScheduleTeam[]
-  zoneHead            Zone[]           @relation("ZoneHead")
+  zoneAssignments      EmployeeZone[]
+  serviceRequests      ServiceRequest[] @relation("AssignedEmployee")
+  scheduleAssignments  ScheduleTeam[]
+  zoneHead             Zone[]           @relation("ZoneHead")
+  zoneSecondaryHead    Zone[]           @relation("ZoneSecondaryHead")
+  leaveBalances        LeaveBalance[]
+  leaveRequests        LeaveRequest[]   @relation("LeaveRequests")
+  leaveApprovals       LeaveRequest[]   @relation("LeaveApprover")
+  leaveCoverages       LeaveRequest[]   @relation("LeaveCoverage")
 
   @@map("employees")
   @@schema("fixitbh_ac")
 }
 
 model JobTitle {
-  id        String     @id @default(cuid())
-  name      String     @unique
-  nameAr    String?    @map("name_ar")
-  isActive  Boolean    @default(true) @map("is_active")
-  createdAt DateTime   @default(now()) @map("created_at")
-  updatedAt DateTime   @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  name      String   @unique
+  nameAr    String?  @map("name_ar")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
   employees Employee[]
@@ -232,7 +287,7 @@ model Country {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  states    State[]
+  states State[]
 
   @@map("countries")
   @@schema("fixitbh_ac")
@@ -258,15 +313,15 @@ model State {
 }
 
 model District {
-  id           String       @id @default(cuid())
-  stateId      String       @map("state_id")
-  state        State        @relation(fields: [stateId], references: [id], onDelete: Cascade)
-  name         String
-  nameAr       String?      @map("name_ar")
-  code         String?
-  isActive     Boolean      @default(true) @map("is_active")
-  createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  stateId   String   @map("state_id")
+  state     State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  name      String
+  nameAr    String?  @map("name_ar")
+  code      String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
   governorates Governorate[]
@@ -288,7 +343,7 @@ model Governorate {
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   // Relations
-  zones      Zone[]
+  zones Zone[]
 
   @@unique([districtId, name])
   @@map("governorates")
@@ -297,24 +352,66 @@ model Governorate {
 
 model Zone {
   id            String      @id @default(cuid())
-  governorateId String      @map("governorate_id")
-  governorate   Governorate @relation(fields: [governorateId], references: [id], onDelete: Cascade)
-  name          String
-  nameAr        String?     @map("name_ar")
-  code          String?     @unique
-  headId        String?     @map("head_id")
-  head          Employee?   @relation("ZoneHead", fields: [headId], references: [id])
-  isActive      Boolean     @default(true) @map("is_active")
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
+  governorateId     String      @map("governorate_id")
+  governorate       Governorate @relation(fields: [governorateId], references: [id], onDelete: Cascade)
+  name              String
+  nameAr            String?     @map("name_ar")
+  code              String?     @unique
+  headId            String?     @map("head_id")
+  head              Employee?   @relation("ZoneHead", fields: [headId], references: [id])
+  secondaryHeadId   String?     @map("secondary_head_id")
+  secondaryHead     Employee?   @relation("ZoneSecondaryHead", fields: [secondaryHeadId], references: [id])
+  isActive          Boolean     @default(true) @map("is_active")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
 
   // Relations
   employees       EmployeeZone[]
-  properties      Property[]
+  blocks          Block[]
+  buildings       Building[]
   serviceRequests ServiceRequest[]
 
   @@unique([governorateId, name])
   @@map("zones")
+  @@schema("fixitbh_ac")
+}
+
+model Block {
+  id        String   @id @default(cuid())
+  zoneId    String   @map("zone_id")
+  zone      Zone     @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  blockNo   String   @map("block_no")
+  name      String?
+  nameAr    String?  @map("name_ar")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  roads     Road[]
+  buildings Building[]
+
+  @@unique([zoneId, blockNo])
+  @@map("blocks")
+  @@schema("fixitbh_ac")
+}
+
+model Road {
+  id        String   @id @default(cuid())
+  blockId   String   @map("block_id")
+  block     Block    @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  roadNo    String   @map("road_no")
+  name      String?
+  nameAr    String?  @map("name_ar")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  buildings Building[]
+
+  @@unique([blockId, roadNo])
+  @@map("roads")
   @@schema("fixitbh_ac")
 }
 
@@ -323,94 +420,312 @@ model EmployeeZone {
   zoneId     String   @map("zone_id")
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   zone       Zone     @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  role       ZoneRole @default(HELPER) @map("zone_role")
   isPrimary  Boolean  @default(false) @map("is_primary")
+  isActive   Boolean  @default(true) @map("is_active")
   createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   @@id([employeeId, zoneId])
   @@map("employee_zones")
   @@schema("fixitbh_ac")
 }
 
+// ==================== LEAVE MANAGEMENT ====================
+
+model LeaveType {
+  id              String   @id @default(cuid())
+  name            String   @unique // Annual, Sick, Emergency, Maternity, Paternity, etc.
+  nameAr          String?  @map("name_ar")
+  description     String?
+  defaultDays     Int      @default(0) @map("default_days") // Default annual allocation
+  isPaid          Boolean  @default(true) @map("is_paid")
+  requiresApproval Boolean @default(true) @map("requires_approval")
+  maxConsecutiveDays Int?  @map("max_consecutive_days")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  balances        LeaveBalance[]
+  requests        LeaveRequest[]
+
+  @@map("leave_types")
+  @@schema("fixitbh_ac")
+}
+
+model LeaveBalance {
+  id              String   @id @default(cuid())
+  employeeId      String   @map("employee_id")
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveTypeId     String   @map("leave_type_id")
+  leaveType       LeaveType @relation(fields: [leaveTypeId], references: [id])
+  year            Int      // Year for balance (e.g., 2025)
+  totalDays       Float    @map("total_days") // Total allocated days
+  usedDays        Float    @default(0) @map("used_days") // Days already used
+  pendingDays     Float    @default(0) @map("pending_days") // Days in pending requests
+  carryOverDays   Float    @default(0) @map("carry_over_days") // Carried from previous year
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([employeeId, leaveTypeId, year])
+  @@map("leave_balances")
+  @@schema("fixitbh_ac")
+}
+
+model LeaveRequest {
+  id              String       @id @default(cuid())
+  employeeId      String       @map("employee_id")
+  employee        Employee     @relation("LeaveRequests", fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveTypeId     String       @map("leave_type_id")
+  leaveType       LeaveType    @relation(fields: [leaveTypeId], references: [id])
+  startDate       DateTime     @map("start_date")
+  endDate         DateTime     @map("end_date")
+  totalDays       Float        @map("total_days")
+  reason          String?
+  status          LeaveStatus  @default(PENDING)
+  approverId      String?      @map("approver_id")
+  approver        Employee?    @relation("LeaveApprover", fields: [approverId], references: [id])
+  approvedAt      DateTime?    @map("approved_at")
+  rejectionReason String?      @map("rejection_reason")
+  coveringEmployeeId String?   @map("covering_employee_id") // Who covers during leave
+  coveringEmployee Employee?   @relation("LeaveCoverage", fields: [coveringEmployeeId], references: [id])
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  @@map("leave_requests")
+  @@schema("fixitbh_ac")
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+
+  @@schema("fixitbh_ac")
+}
+
 // ==================== CUSTOMER ====================
 
 model Customer {
-  id            String       @id @default(cuid())
-  userId        String?      @unique @map("user_id")
-  user          User?        @relation(fields: [userId], references: [id])
-  customerNo    String       @unique @map("customer_no")
-  customerType  CustomerType @default(INDIVIDUAL) @map("customer_type")
-  firstName     String?      @map("first_name")
-  lastName      String?      @map("last_name")
-  firstNameAr   String?      @map("first_name_ar")
-  lastNameAr    String?      @map("last_name_ar")
-  orgName       String?      @map("org_name")
-  orgNameAr     String?      @map("org_name_ar")
-  email         String       @unique
-  phone         String?
-  altPhone      String?      @map("alt_phone")
-  nationalId    String?      @map("national_id")
-  isActive      Boolean      @default(true) @map("is_active")
-  isVerified    Boolean      @default(false) @map("is_verified")
-  createdAt     DateTime     @default(now()) @map("created_at")
-  updatedAt     DateTime     @updatedAt @map("updated_at")
+  id           String       @id @default(cuid())
+  userId       String?      @unique @map("user_id")
+  user         User?        @relation(fields: [userId], references: [id])
+  customerNo   String       @unique @map("customer_no")
+  customerType CustomerType @default(INDIVIDUAL) @map("customer_type")
+  firstName    String?      @map("first_name")
+  lastName     String?      @map("last_name")
+  firstNameAr  String?      @map("first_name_ar")
+  lastNameAr   String?      @map("last_name_ar")
+  orgName      String?      @map("org_name")
+  orgNameAr    String?      @map("org_name_ar")
+  email        String?      @unique
+  phone        String?
+  altPhone     String?      @map("alt_phone")
+  nationalId   String?      @map("national_id")
+  isActive     Boolean      @default(true) @map("is_active")
+  isVerified   Boolean      @default(false) @map("is_verified")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
 
   // Relations
   properties      CustomerProperty[]
+  units           CustomerUnit[]
   serviceRequests ServiceRequest[]
   invoices        Invoice[]
+  amcContracts    AmcContract[]
+  quotes          Quote[]
+  receipts        Receipt[]
 
   @@map("customers")
   @@schema("fixitbh_ac")
 }
 
 enum CustomerType {
-  @@schema("fixitbh_ac")
   INDIVIDUAL
   ORGANIZATION
+
+  @@schema("fixitbh_ac")
 }
 
-// ==================== PROPERTY ====================
+enum ZoneRole {
+  PRIMARY_HEAD      // Primary Zone Head
+  SECONDARY_HEAD    // Backup Zone Head (covers when primary is on leave)
+  TECHNICIAN        // Zone Technician
+  HELPER            // Zone Helper
 
-model Property {
-  id          String       @id @default(cuid())
-  propertyNo  String       @unique @map("property_no")
-  name        String
-  nameAr      String?      @map("name_ar")
-  typeId      String       @map("type_id")
-  type        PropertyType @relation(fields: [typeId], references: [id])
-  zoneId      String?      @map("zone_id")
-  zone        Zone?        @relation(fields: [zoneId], references: [id])
-  address     String?
-  addressAr   String?      @map("address_ar")
-  building    String?
-  floor       String?
-  unit        String?
-  area        String?
-  landmark    String?
-  latitude    Float?
-  longitude   Float?
-  qrCode      String?      @map("qr_code")
-  isActive    Boolean      @default(true) @map("is_active")
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
+  @@schema("fixitbh_ac")
+}
+
+// ==================== BUILDING & PROPERTY ====================
+
+model Building {
+  id             String        @id @default(cuid())
+  buildingNumber String        @unique @map("building_number") // Building/house number entered by user (e.g., "123")
+  roadNumber     String        @map("road_number") // Road number (e.g., "4567")
+  blockNumber    String        @map("block_number") // Block number (e.g., "345")
+  name           String?       // Building name (optional - not all buildings have names)
+  nameAr         String?       @map("name_ar")
+  typeId         String?       @map("type_id")
+  type           BuildingType? @relation(fields: [typeId], references: [id])
+  blockId        String?       @map("block_id")
+  block          Block?        @relation(fields: [blockId], references: [id])
+  roadId         String?       @map("road_id")
+  road           Road?         @relation(fields: [roadId], references: [id])
+  zoneId         String?       @map("zone_id")
+  zone           Zone?         @relation(fields: [zoneId], references: [id])
+  totalFloors    Int           @default(1) @map("total_floors")
+  totalUnits     Int           @default(0) @map("total_units")
+  yearBuilt      Int?          @map("year_built")
+  latitude       Float?
+  longitude      Float?
+  googlePlaceId  String?       @map("google_place_id")
+  googleMapId    String?       @map("google_map_id")
+  landmark       String?
+  landmarkAr     String?       @map("landmark_ar")
+  address        String? // Full formatted address
+  addressAr      String?       @map("address_ar")
+  qrCode         String?       @map("qr_code")
+  isActive       Boolean       @default(true) @map("is_active")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
 
   // Relations
-  customers       CustomerProperty[]
-  rooms           Room[]
-  assets          Asset[]
-  serviceRequests ServiceRequest[]
+  units      Unit[]
+  assets     Asset[]    @relation("BuildingAssets")
+  facilities Facility[]
+
+  @@map("buildings")
+  @@schema("fixitbh_ac")
+}
+
+model BuildingType {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  nameAr      String?  @map("name_ar")
+  description String?
+  icon        String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  buildings Building[]
+
+  @@map("building_types")
+  @@schema("fixitbh_ac")
+}
+
+model Unit {
+  id          String     @id @default(cuid())
+  unitNo      String     @unique @map("unit_no")
+  buildingId  String     @map("building_id")
+  building    Building   @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  typeId      String?    @map("type_id")
+  type        UnitType?  @relation(fields: [typeId], references: [id])
+  flatNumber  String?    @map("flat_number")
+  unitSuffix  String?    @map("unit_suffix") // Like A, B in 11A, 11B
+  floor       Int?
+  bedrooms    Int?
+  bathrooms   Int?
+  areaSqm     Float?     @map("area_sqm")
+  isFurnished Boolean    @default(false) @map("is_furnished")
+  monthlyRent Decimal?   @map("monthly_rent") @db.Decimal(10, 2)
+  status      UnitStatus @default(VACANT)
+  qrCode      String?    @map("qr_code")
+  isActive    Boolean    @default(true) @map("is_active")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  customers            CustomerUnit[]
+  rooms                Room[]
+  assets               Asset[]
+  serviceRequests      ServiceRequest[]
+  amcContractProperties AmcContractProperty[]
+  amcServiceSchedules  AmcServiceSchedule[]
+  quotes               Quote[]
+
+  @@unique([buildingId, flatNumber, unitSuffix])
+  @@map("units")
+  @@schema("fixitbh_ac")
+}
+
+model UnitType {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  nameAr      String?  @map("name_ar")
+  description String?
+  icon        String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  units Unit[]
+
+  @@map("unit_types")
+  @@schema("fixitbh_ac")
+}
+
+enum UnitStatus {
+  VACANT
+  OCCUPIED
+  MAINTENANCE
+  RESERVED
+
+  @@schema("fixitbh_ac")
+}
+
+// Legacy Property model - keeping for backward compatibility with older data
+model Property {
+  id         String       @id @default(cuid())
+  propertyNo String       @unique @map("property_no")
+  name       String
+  nameAr     String?      @map("name_ar")
+  typeId     String       @map("type_id")
+  type       PropertyType @relation(fields: [typeId], references: [id])
+  zoneId     String?      @map("zone_id")
+  address    String?
+  addressAr  String?      @map("address_ar")
+  building   String?
+  floor      String?
+  unit       String?
+  area       String?
+  landmark   String?
+  latitude   Float?
+  longitude  Float?
+  qrCode     String?      @map("qr_code")
+  isActive   Boolean      @default(false) @map("is_active") // Legacy records disabled by default
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  customers             CustomerProperty[]
+  serviceRequests       ServiceRequest[]
+  amcContractProperties AmcContractProperty[]
+  amcServiceSchedules   AmcServiceSchedule[]
+  quotes                Quote[]
 
   @@map("properties")
   @@schema("fixitbh_ac")
 }
 
 model PropertyType {
-  id        String     @id @default(cuid())
-  name      String     @unique
-  nameAr    String?    @map("name_ar")
-  isActive  Boolean    @default(true) @map("is_active")
-  createdAt DateTime   @default(now()) @map("created_at")
-  updatedAt DateTime   @updatedAt @map("updated_at")
+  id          String   @id @default(cuid())
+  name        String   @unique
+  nameAr      String?  @map("name_ar")
+  description String?
+  level       Int      @default(1)
+  parentId    String?  @map("parent_id")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Self-referential relation for hierarchy
+  parent   PropertyType?  @relation("PropertyTypeHierarchy", fields: [parentId], references: [id])
+  children PropertyType[] @relation("PropertyTypeHierarchy")
 
   // Relations
   properties Property[]
@@ -420,15 +735,15 @@ model PropertyType {
 }
 
 model CustomerProperty {
-  customerId     String       @map("customer_id")
-  propertyId     String       @map("property_id")
-  customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  property       Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  ownershipType  OwnershipType @default(OWNER) @map("ownership_type")
-  isPrimary      Boolean      @default(false) @map("is_primary")
-  startDate      DateTime?    @map("start_date")
-  endDate        DateTime?    @map("end_date")
-  createdAt      DateTime     @default(now()) @map("created_at")
+  customerId    String        @map("customer_id")
+  propertyId    String        @map("property_id")
+  customer      Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  property      Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  ownershipType OwnershipType @default(OWNER) @map("ownership_type")
+  isPrimary     Boolean       @default(false) @map("is_primary")
+  startDate     DateTime?     @map("start_date")
+  endDate       DateTime?     @map("end_date")
+  createdAt     DateTime      @default(now()) @map("created_at")
 
   @@id([customerId, propertyId])
   @@map("customer_properties")
@@ -436,73 +751,315 @@ model CustomerProperty {
 }
 
 enum OwnershipType {
-  @@schema("fixitbh_ac")
   OWNER
   TENANT
+
+  @@schema("fixitbh_ac")
+}
+
+model CustomerUnit {
+  customerId    String        @map("customer_id")
+  unitId        String        @map("unit_id")
+  customer      Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  unit          Unit          @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  ownershipType OwnershipType @default(TENANT) @map("ownership_type")
+  isPrimary     Boolean       @default(false) @map("is_primary")
+  startDate     DateTime?     @map("start_date")
+  endDate       DateTime?     @map("end_date")
+  monthlyRent   Decimal?      @map("monthly_rent") @db.Decimal(10, 2)
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  @@id([customerId, unitId])
+  @@map("customer_units")
+  @@schema("fixitbh_ac")
 }
 
 model Room {
-  id         String   @id @default(cuid())
-  propertyId String   @map("property_id")
-  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  name       String
-  nameAr     String?  @map("name_ar")
-  floor      String?
-  isActive   Boolean  @default(true) @map("is_active")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id        String    @id @default(cuid())
+  unitId    String    @map("unit_id")
+  unit      Unit      @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  typeId    String?   @map("type_id")
+  type      RoomType? @relation(fields: [typeId], references: [id])
+  name      String
+  nameAr    String?   @map("name_ar")
+  floor     String?
+  hasAttachedBathroom Boolean @default(false) @map("has_attached_bathroom")
+  areaSqm   Float?    @map("area_sqm")
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  assets     Asset[]
+  assets Asset[]
 
   @@map("rooms")
+  @@schema("fixitbh_ac")
+}
+
+model RoomType {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  nameAr      String?  @map("name_ar")
+  category    String?  // RESIDENTIAL, COMMON_FACILITY
+  icon        String?
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  rooms Room[]
+
+  @@map("room_types")
+  @@schema("fixitbh_ac")
+}
+
+// ==================== COMMON FACILITIES (for compounds/villas) ====================
+
+model Facility {
+  id          String       @id @default(cuid())
+  facilityNo  String       @unique @map("facility_no")
+  buildingId  String?      @map("building_id")
+  building    Building?    @relation(fields: [buildingId], references: [id])
+  typeId      String       @map("type_id")
+  type        FacilityType @relation(fields: [typeId], references: [id])
+  name        String
+  nameAr      String?      @map("name_ar")
+  location    String?      // e.g., "Ground Floor", "Rooftop", "Outdoor"
+  capacity    Int?         // max occupancy for gyms, theaters, etc.
+  operatingHours String?   @map("operating_hours") // e.g., "6AM-10PM"
+  rules       String?      // usage rules
+  isActive    Boolean      @default(true) @map("is_active")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  assets Asset[] @relation("FacilityAssets")
+
+  @@map("facilities")
+  @@schema("fixitbh_ac")
+}
+
+model FacilityType {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  nameAr      String?  @map("name_ar")
+  icon        String?
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  facilities Facility[]
+
+  @@map("facility_types")
   @@schema("fixitbh_ac")
 }
 
 // ==================== ASSET ====================
 
 model Asset {
-  id               String     @id @default(cuid())
-  assetNo          String     @unique @map("asset_no")
-  propertyId       String     @map("property_id")
-  property         Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  roomId           String?    @map("room_id")
-  room             Room?      @relation(fields: [roomId], references: [id])
-  typeId           String     @map("type_id")
-  type             AssetType  @relation(fields: [typeId], references: [id])
-  brand            String?
-  model            String?
-  serialNumber     String?    @map("serial_number")
-  purchaseDate     DateTime?  @map("purchase_date")
-  installDate      DateTime?  @map("install_date")
-  warrantyEndDate  DateTime?  @map("warranty_end_date")
-  amcEndDate       DateTime?  @map("amc_end_date")
-  specifications   Json?
-  qrCode           String?    @map("qr_code")
-  isActive         Boolean    @default(true) @map("is_active")
-  createdAt        DateTime   @default(now()) @map("created_at")
-  updatedAt        DateTime   @updatedAt @map("updated_at")
+  id              String          @id @default(cuid())
+  assetNo         String          @unique @map("asset_no")
+  // Location - asset can be at building level, unit level, room level, or facility level
+  buildingId      String?         @map("building_id")
+  building        Building?       @relation("BuildingAssets", fields: [buildingId], references: [id])
+  unitId          String?         @map("unit_id")
+  unit            Unit?           @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  roomId          String?         @map("room_id")
+  room            Room?           @relation(fields: [roomId], references: [id])
+  facilityId      String?         @map("facility_id")
+  facility        Facility?       @relation("FacilityAssets", fields: [facilityId], references: [id])
+  // Asset details
+  typeId          String          @map("type_id")
+  type            AssetType       @relation(fields: [typeId], references: [id])
+  name            String?         // e.g., "Living Room AC", "Main Entrance CCTV"
+  nameAr          String?         @map("name_ar")
+  brand           String?         // e.g., "Daikin", "Hikvision"
+  model           String?         // e.g., "FTKF35TV16U"
+  serialNumber    String?         @map("serial_number")
+  capacity        String?         // e.g., "1.5 Ton", "4MP"
+  specifications  Json?           // Additional specs as JSON
+  // Financial & Dates
+  purchasePrice   Decimal?        @map("purchase_price") @db.Decimal(10, 2)
+  purchaseDate    DateTime?       @map("purchase_date")
+  installDate     DateTime?       @map("install_date")
+  warrantyEndDate DateTime?       @map("warranty_end_date")
+  amcEndDate      DateTime?       @map("amc_end_date") // Annual Maintenance Contract end
+  expectedLifeYears Int?          @map("expected_life_years")
+  // Status tracking
+  status          AssetStatus     @default(ACTIVE)
+  condition       AssetCondition  @default(GOOD)
+  lastServiceDate DateTime?       @map("last_service_date")
+  nextServiceDue  DateTime?       @map("next_service_due")
+  // Replacement tracking
+  replacedById    String?         @map("replaced_by_id")
+  replacedBy      Asset?          @relation("AssetReplacement", fields: [replacedById], references: [id])
+  replaces        Asset[]         @relation("AssetReplacement")
+  replacedAt      DateTime?       @map("replaced_at")
+  replacementReason String?       @map("replacement_reason")
+  // Totals (calculated/cached for performance)
+  totalServiceCost Decimal?       @map("total_service_cost") @db.Decimal(10, 2)
+  serviceCount     Int            @default(0) @map("service_count")
+  // Standard fields
+  qrCode          String?         @map("qr_code")
+  notes           String?
+  isActive        Boolean         @default(true) @map("is_active")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
 
   // Relations
-  serviceRequests  ServiceRequest[]
+  serviceRequests ServiceRequest[]
+  serviceHistory  AssetServiceHistory[]
+  documents       AssetDocument[]
 
   @@map("assets")
   @@schema("fixitbh_ac")
 }
 
+enum AssetStatus {
+  ACTIVE        // Currently in use
+  INACTIVE      // Not in use but not disposed
+  MAINTENANCE   // Under repair/maintenance
+  REPLACED      // Replaced by another asset
+  DISPOSED      // Removed/disposed
+
+  @@schema("fixitbh_ac")
+}
+
+enum AssetCondition {
+  EXCELLENT     // New or like-new condition
+  GOOD          // Working well with minor wear
+  FAIR          // Functioning but showing age
+  POOR          // Needs attention/repair soon
+  CRITICAL      // Urgent repair/replacement needed
+
+  @@schema("fixitbh_ac")
+}
+
 model AssetType {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  nameAr    String?  @map("name_ar")
-  icon      String?
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id          String            @id @default(cuid())
+  name        String            @unique
+  nameAr      String?           @map("name_ar")
+  category    AssetCategory     @default(GENERAL)
+  icon        String?
+  description String?
+  // Default maintenance schedule
+  defaultServiceIntervalDays Int? @map("default_service_interval_days")
+  defaultLifeYears           Int? @map("default_life_years")
+  isActive    Boolean           @default(true) @map("is_active")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
 
   // Relations
-  assets    Asset[]
+  assets Asset[]
 
   @@map("asset_types")
+  @@schema("fixitbh_ac")
+}
+
+enum AssetCategory {
+  HVAC              // AC, heating, ventilation
+  ELECTRICAL        // Wiring, panels, generators
+  PLUMBING          // Water heaters, pumps, pipes
+  FIRE_SAFETY       // Fire extinguishers, alarms, sprinklers
+  SECURITY          // CCTV, access control, alarms
+  ELEVATOR          // Lifts, escalators
+  APPLIANCES        // Kitchen appliances, washing machines
+  FURNITURE         // Beds, sofas, tables
+  ENTERTAINMENT     // TV, sound systems, projectors
+  POOL_EQUIPMENT    // Pumps, filters, heaters
+  GYM_EQUIPMENT     // Treadmills, weights, machines
+  CLEANING          // Vacuum cleaners, pressure washers
+  LANDSCAPING       // Irrigation, garden equipment
+  GENERAL           // Other/miscellaneous
+
+  @@schema("fixitbh_ac")
+}
+
+// Service history tracking - persists across tenant changes
+model AssetServiceHistory {
+  id              String              @id @default(cuid())
+  assetId         String              @map("asset_id")
+  asset           Asset               @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  serviceType     ServiceType         @default(REPAIR) @map("service_type")
+  // Service details
+  description     String
+  performedBy     String?             @map("performed_by") // Technician/company name
+  performedAt     DateTime            @default(now()) @map("performed_at")
+  // Cost tracking
+  laborCost       Decimal?            @map("labor_cost") @db.Decimal(10, 2)
+  partsCost       Decimal?            @map("parts_cost") @db.Decimal(10, 2)
+  totalCost       Decimal?            @map("total_cost") @db.Decimal(10, 2)
+  // Parts used
+  partsUsed       Json?               @map("parts_used") // [{name, qty, cost}]
+  // Condition before/after
+  conditionBefore AssetCondition?     @map("condition_before")
+  conditionAfter  AssetCondition?     @map("condition_after")
+  // Warranty/AMC info
+  isCoveredByWarranty Boolean         @default(false) @map("is_covered_by_warranty")
+  isCoveredByAmc      Boolean         @default(false) @map("is_covered_by_amc")
+  // Reference
+  serviceRequestId String?            @map("service_request_id")
+  invoiceNumber    String?            @map("invoice_number")
+  notes            String?
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  @@map("asset_service_history")
+  @@schema("fixitbh_ac")
+}
+
+enum ServiceType {
+  INSTALLATION    // Initial setup
+  REPAIR          // Fix a problem
+  MAINTENANCE     // Scheduled maintenance
+  INSPECTION      // Check/assessment
+  CLEANING        // Deep cleaning
+  REPLACEMENT     // Part replacement (not full asset)
+  UPGRADE         // Enhancement/improvement
+
+  @@schema("fixitbh_ac")
+}
+
+// Documents associated with assets (warranty cards, insurance, manuals)
+model AssetDocument {
+  id            String           @id @default(cuid())
+  assetId       String           @map("asset_id")
+  asset         Asset            @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  documentType  AssetDocumentType @map("document_type")
+  name          String
+  fileName      String           @map("file_name")
+  fileType      String           @map("file_type")
+  fileSize      Int              @map("file_size")
+  filePath      String           @map("file_path")
+  // For warranty/insurance docs
+  issueDate     DateTime?        @map("issue_date")
+  expiryDate    DateTime?        @map("expiry_date")
+  provider      String?          // Insurance company, warranty provider
+  policyNumber  String?          @map("policy_number")
+  coverageAmount Decimal?        @map("coverage_amount") @db.Decimal(10, 2)
+  notes         String?
+  uploadedBy    String?          @map("uploaded_by")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  @@map("asset_documents")
+  @@schema("fixitbh_ac")
+}
+
+enum AssetDocumentType {
+  WARRANTY_CARD
+  INSURANCE_POLICY
+  PURCHASE_INVOICE
+  INSTALLATION_CERT
+  AMC_CONTRACT
+  USER_MANUAL
+  SERVICE_REPORT
+  INSPECTION_CERT
+  OTHER
+
   @@schema("fixitbh_ac")
 }
 
@@ -513,8 +1070,10 @@ model ServiceRequest {
   requestNo       String        @unique @map("request_no")
   customerId      String        @map("customer_id")
   customer        Customer      @relation(fields: [customerId], references: [id])
-  propertyId      String        @map("property_id")
-  property        Property      @relation(fields: [propertyId], references: [id])
+  propertyId      String?       @map("property_id")
+  property        Property?     @relation(fields: [propertyId], references: [id])
+  unitId          String?       @map("unit_id")
+  unit            Unit?         @relation(fields: [unitId], references: [id])
   assetId         String?       @map("asset_id")
   asset           Asset?        @relation(fields: [assetId], references: [id])
   zoneId          String        @map("zone_id")
@@ -540,35 +1099,37 @@ model ServiceRequest {
   updatedAt       DateTime      @updatedAt @map("updated_at")
 
   // Relations
-  timeline        RequestTimeline[]
-  attachments     RequestAttachment[]
-  quotations      Quotation[]
-  schedules       Schedule[]
-  materialUsage   MaterialUsage[]
-  invoice         Invoice?
+  timeline      RequestTimeline[]
+  attachments   RequestAttachment[]
+  quotations    Quotation[]
+  schedules     Schedule[]
+  materialUsage MaterialUsage[]
+  invoice       Invoice?
+  amcSchedule   AmcServiceSchedule?
 
   @@map("service_requests")
   @@schema("fixitbh_ac")
 }
 
 enum RequestType {
-  @@schema("fixitbh_ac")
   ON_CALL
   EMERGENCY
   AMC
   WARRANTY
+
+  @@schema("fixitbh_ac")
 }
 
 enum Priority {
-  @@schema("fixitbh_ac")
   LOW
   MEDIUM
   HIGH
   EMERGENCY
+
+  @@schema("fixitbh_ac")
 }
 
 enum RequestStatus {
-  @@schema("fixitbh_ac")
   NEW
   ASSIGNED
   SCHEDULED
@@ -578,16 +1139,19 @@ enum RequestStatus {
   INVOICED
   CLOSED
   CANCELLED
+
+  @@schema("fixitbh_ac")
 }
 
 enum RequestSource {
-  @@schema("fixitbh_ac")
   PORTAL
   MOBILE
   AI_CHAT
   PHONE
   EMAIL
   WALK_IN
+
+  @@schema("fixitbh_ac")
 }
 
 model ComplaintType {
@@ -600,8 +1164,10 @@ model ComplaintType {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  serviceRequests ServiceRequest[]
-  slaConfigs      SlaConfig[]
+  serviceRequests     ServiceRequest[]
+  slaConfigs          SlaConfig[]
+  amcContractServices AmcContractService[]
+  amcServiceSchedules AmcServiceSchedule[]
 
   @@map("complaint_types")
   @@schema("fixitbh_ac")
@@ -638,16 +1204,16 @@ model RequestAttachment {
 // ==================== SLA ====================
 
 model SlaConfig {
-  id              String        @id @default(cuid())
+  id              String         @id @default(cuid())
   name            String
   priority        Priority
-  complaintTypeId String?       @map("complaint_type_id")
+  complaintTypeId String?        @map("complaint_type_id")
   complaintType   ComplaintType? @relation(fields: [complaintTypeId], references: [id])
-  responseTime    Int           @map("response_time") // in minutes
-  resolutionTime  Int           @map("resolution_time") // in minutes
-  isActive        Boolean       @default(true) @map("is_active")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
+  responseTime    Int            @map("response_time") // in minutes
+  resolutionTime  Int            @map("resolution_time") // in minutes
+  isActive        Boolean        @default(true) @map("is_active")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
 
   @@map("sla_configs")
   @@schema("fixitbh_ac")
@@ -656,37 +1222,38 @@ model SlaConfig {
 // ==================== QUOTATION ====================
 
 model Quotation {
-  id               String         @id @default(cuid())
-  quotationNo      String         @unique @map("quotation_no")
-  serviceRequestId String         @map("service_request_id")
-  serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id])
+  id               String          @id @default(cuid())
+  quotationNo      String          @unique @map("quotation_no")
+  serviceRequestId String          @map("service_request_id")
+  serviceRequest   ServiceRequest  @relation(fields: [serviceRequestId], references: [id])
   status           QuotationStatus @default(DRAFT)
-  subtotal         Decimal        @db.Decimal(10, 2)
-  taxAmount        Decimal        @default(0) @map("tax_amount") @db.Decimal(10, 2)
-  discountAmount   Decimal        @default(0) @map("discount_amount") @db.Decimal(10, 2)
-  total            Decimal        @db.Decimal(10, 2)
+  subtotal         Decimal         @db.Decimal(10, 2)
+  taxAmount        Decimal         @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  discountAmount   Decimal         @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  total            Decimal         @db.Decimal(10, 2)
   notes            String?
-  validUntil       DateTime?      @map("valid_until")
-  approvedAt       DateTime?      @map("approved_at")
-  approvedBy       String?        @map("approved_by")
-  createdBy        String         @map("created_by")
-  createdAt        DateTime       @default(now()) @map("created_at")
-  updatedAt        DateTime       @updatedAt @map("updated_at")
+  validUntil       DateTime?       @map("valid_until")
+  approvedAt       DateTime?       @map("approved_at")
+  approvedBy       String?         @map("approved_by")
+  createdBy        String          @map("created_by")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
 
   // Relations
-  items            QuotationItem[]
+  items QuotationItem[]
 
   @@map("quotations")
   @@schema("fixitbh_ac")
 }
 
 enum QuotationStatus {
-  @@schema("fixitbh_ac")
   DRAFT
   SENT
   APPROVED
   REJECTED
   EXPIRED
+
+  @@schema("fixitbh_ac")
 }
 
 model QuotationItem {
@@ -705,10 +1272,11 @@ model QuotationItem {
 }
 
 enum ItemType {
-  @@schema("fixitbh_ac")
   SERVICE
   MATERIAL
   LABOR
+
+  @@schema("fixitbh_ac")
 }
 
 // ==================== SCHEDULE ====================
@@ -727,20 +1295,21 @@ model Schedule {
   updatedAt        DateTime       @updatedAt @map("updated_at")
 
   // Relations
-  team             ScheduleTeam[]
+  team ScheduleTeam[]
 
   @@map("schedules")
   @@schema("fixitbh_ac")
 }
 
 enum ScheduleStatus {
-  @@schema("fixitbh_ac")
   SCHEDULED
   CONFIRMED
   IN_PROGRESS
   COMPLETED
   CANCELLED
   RESCHEDULED
+
+  @@schema("fixitbh_ac")
 }
 
 model ScheduleTeam {
@@ -759,24 +1328,24 @@ model ScheduleTeam {
 // ==================== INVENTORY ====================
 
 model InventoryItem {
-  id            String   @id @default(cuid())
-  itemNo        String   @unique @map("item_no")
-  name          String
-  nameAr        String?  @map("name_ar")
-  categoryId    String   @map("category_id")
-  category      InventoryCategory @relation(fields: [categoryId], references: [id])
-  description   String?
-  unit          String   @default("piece")
-  unitPrice     Decimal  @default(0) @map("unit_price") @db.Decimal(10, 2)
-  currentStock  Int      @default(0) @map("current_stock")
-  minStock      Int      @default(0) @map("min_stock")
-  maxStock      Int?     @map("max_stock")
-  isActive      Boolean  @default(true) @map("is_active")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id           String            @id @default(cuid())
+  itemNo       String            @unique @map("item_no")
+  name         String
+  nameAr       String?           @map("name_ar")
+  categoryId   String            @map("category_id")
+  category     InventoryCategory @relation(fields: [categoryId], references: [id])
+  description  String?
+  unit         String            @default("piece")
+  unitPrice    Decimal           @default(0) @map("unit_price") @db.Decimal(10, 2)
+  currentStock Int               @default(0) @map("current_stock")
+  minStock     Int               @default(0) @map("min_stock")
+  maxStock     Int?              @map("max_stock")
+  isActive     Boolean           @default(true) @map("is_active")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
 
   // Relations
-  materialUsage MaterialUsage[]
+  materialUsage  MaterialUsage[]
   stockMovements StockMovement[]
 
   @@map("inventory_items")
@@ -784,15 +1353,15 @@ model InventoryItem {
 }
 
 model InventoryCategory {
-  id        String          @id @default(cuid())
-  name      String          @unique
-  nameAr    String?         @map("name_ar")
-  isActive  Boolean         @default(true) @map("is_active")
-  createdAt DateTime        @default(now()) @map("created_at")
-  updatedAt DateTime        @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  name      String   @unique
+  nameAr    String?  @map("name_ar")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  items     InventoryItem[]
+  items InventoryItem[]
 
   @@map("inventory_categories")
   @@schema("fixitbh_ac")
@@ -831,12 +1400,13 @@ model StockMovement {
 }
 
 enum MovementType {
-  @@schema("fixitbh_ac")
   PURCHASE
   USAGE
   ADJUSTMENT
   RETURN
   TRANSFER
+
+  @@schema("fixitbh_ac")
 }
 
 // ==================== INVOICE ====================
@@ -862,21 +1432,25 @@ model Invoice {
   updatedAt        DateTime       @updatedAt @map("updated_at")
 
   // Relations
-  items            InvoiceItem[]
-  payments         Payment[]
+  items       InvoiceItem[]
+  payments    Payment[]
+  amcPayments AmcPaymentSchedule[]
+  receipts    Receipt[]
+  fromQuote   Quote?               @relation("QuoteToInvoice")
 
   @@map("invoices")
   @@schema("fixitbh_ac")
 }
 
 enum InvoiceStatus {
-  @@schema("fixitbh_ac")
   DRAFT
   SENT
   PAID
   PARTIAL
   OVERDUE
   CANCELLED
+
+  @@schema("fixitbh_ac")
 }
 
 model InvoiceItem {
@@ -906,40 +1480,43 @@ model Payment {
   receivedBy    String        @map("received_by")
   receivedAt    DateTime      @default(now()) @map("received_at")
 
+  // Relations
+  receipt       Receipt?
+
   @@map("payments")
   @@schema("fixitbh_ac")
 }
 
 enum PaymentMethod {
-  @@schema("fixitbh_ac")
   CASH
   CARD
   BANK_TRANSFER
   CHEQUE
   ONLINE
+
+  @@schema("fixitbh_ac")
 }
 
 // ==================== NOTIFICATION ====================
 
 model NotificationTemplate {
-  id        String            @id @default(cuid())
-  name      String            @unique
+  id        String              @id @default(cuid())
+  name      String              @unique
   type      NotificationType
   channel   NotificationChannel
   subject   String?
-  subjectAr String?           @map("subject_ar")
+  subjectAr String?             @map("subject_ar")
   body      String
-  bodyAr    String?           @map("body_ar")
-  isActive  Boolean           @default(true) @map("is_active")
-  createdAt DateTime          @default(now()) @map("created_at")
-  updatedAt DateTime          @updatedAt @map("updated_at")
+  bodyAr    String?             @map("body_ar")
+  isActive  Boolean             @default(true) @map("is_active")
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
 
   @@map("notification_templates")
   @@schema("fixitbh_ac")
 }
 
 enum NotificationType {
-  @@schema("fixitbh_ac")
   REQUEST_CREATED
   REQUEST_ASSIGNED
   REQUEST_SCHEDULED
@@ -951,14 +1528,497 @@ enum NotificationType {
   PAYMENT_RECEIVED
   SLA_WARNING
   SLA_BREACH
+
+  @@schema("fixitbh_ac")
 }
 
 enum NotificationChannel {
-  @@schema("fixitbh_ac")
   EMAIL
   SMS
   PUSH
   IN_APP
+
+  @@schema("fixitbh_ac")
+}
+
+// ==================== AMC (Annual Maintenance Contract) ====================
+
+model AmcContract {
+  id               String           @id @default(cuid())
+  contractNo       String           @unique @map("contract_no")
+  customerId       String           @map("customer_id")
+  customer         Customer         @relation(fields: [customerId], references: [id])
+
+  // Contract Period
+  startDate        DateTime         @map("start_date")
+  endDate          DateTime         @map("end_date")
+
+  // Financial
+  contractValue    Decimal          @map("contract_value") @db.Decimal(10, 3)
+  paymentTerms     AmcPaymentTerms  @default(MONTHLY) @map("payment_terms")
+
+  // Status
+  status           AmcStatus        @default(DRAFT)
+
+  // Auto-renewal
+  autoRenew        Boolean          @default(false) @map("auto_renew")
+  renewalReminderDays Int?          @map("renewal_reminder_days") // Days before expiry to remind
+
+  // Contract Details
+  terms            String?          @db.Text // Terms and conditions
+  notes            String?          @db.Text
+
+  // Renewal tracking
+  renewedFromId    String?          @map("renewed_from_id")
+  renewedFrom      AmcContract?     @relation("AmcRenewal", fields: [renewedFromId], references: [id])
+  renewedTo        AmcContract[]    @relation("AmcRenewal")
+
+  // Audit
+  createdById      String           @map("created_by_id")
+  createdBy        User             @relation("AmcCreatedBy", fields: [createdById], references: [id])
+  approvedById     String?          @map("approved_by_id")
+  approvedBy       User?            @relation("AmcApprovedBy", fields: [approvedById], references: [id])
+  approvedAt       DateTime?        @map("approved_at")
+  cancelledById    String?          @map("cancelled_by_id")
+  cancelledBy      User?            @relation("AmcCancelledBy", fields: [cancelledById], references: [id])
+  cancelledAt      DateTime?        @map("cancelled_at")
+  cancellationReason String?        @map("cancellation_reason")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  properties       AmcContractProperty[]
+  services         AmcContractService[]
+  schedules        AmcServiceSchedule[]
+  payments         AmcPaymentSchedule[]
+
+  @@map("amc_contracts")
+  @@schema("fixitbh_ac")
+}
+
+model AmcContractProperty {
+  id               String       @id @default(cuid())
+  contractId       String       @map("contract_id")
+  contract         AmcContract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  // Can link to Unit (new) or Property (legacy)
+  unitId           String?      @map("unit_id")
+  unit             Unit?        @relation(fields: [unitId], references: [id])
+  propertyId       String?      @map("property_id")
+  property         Property?    @relation(fields: [propertyId], references: [id])
+
+  notes            String?
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  @@unique([contractId, unitId])
+  @@unique([contractId, propertyId])
+  @@map("amc_contract_properties")
+  @@schema("fixitbh_ac")
+}
+
+model AmcContractService {
+  id               String              @id @default(cuid())
+  contractId       String              @map("contract_id")
+  contract         AmcContract         @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  complaintTypeId  String              @map("complaint_type_id")
+  complaintType    ComplaintType       @relation(fields: [complaintTypeId], references: [id])
+
+  // Service frequency
+  frequency        AmcServiceFrequency @default(MONTHLY)
+  visitsPerYear    Int                 @default(12) @map("visits_per_year")
+
+  // Cost allocation (optional - for detailed contract pricing)
+  serviceCost      Decimal?            @map("service_cost") @db.Decimal(10, 3)
+
+  notes            String?
+  createdAt        DateTime            @default(now()) @map("created_at")
+
+  @@unique([contractId, complaintTypeId])
+  @@map("amc_contract_services")
+  @@schema("fixitbh_ac")
+}
+
+model AmcServiceSchedule {
+  id               String               @id @default(cuid())
+  contractId       String               @map("contract_id")
+  contract         AmcContract          @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  // Property for this visit
+  unitId           String?              @map("unit_id")
+  unit             Unit?                @relation(fields: [unitId], references: [id])
+  propertyId       String?              @map("property_id")
+  property         Property?            @relation(fields: [propertyId], references: [id])
+
+  // Service type
+  complaintTypeId  String               @map("complaint_type_id")
+  complaintType    ComplaintType        @relation(fields: [complaintTypeId], references: [id])
+
+  // Schedule
+  scheduledDate    DateTime             @map("scheduled_date")
+  scheduledTime    String?              @map("scheduled_time") // e.g., "09:00-12:00"
+  status           AmcScheduleStatus    @default(SCHEDULED)
+
+  // Link to actual service request when created
+  serviceRequestId String?              @unique @map("service_request_id")
+  serviceRequest   ServiceRequest?      @relation(fields: [serviceRequestId], references: [id])
+
+  // Completion tracking
+  completedAt      DateTime?            @map("completed_at")
+  completedById    String?              @map("completed_by_id")
+  completedBy      User?                @relation("AmcScheduleCompletedBy", fields: [completedById], references: [id])
+
+  notes            String?
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+
+  @@map("amc_service_schedules")
+  @@schema("fixitbh_ac")
+}
+
+model AmcPaymentSchedule {
+  id               String              @id @default(cuid())
+  contractId       String              @map("contract_id")
+  contract         AmcContract         @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  // Payment details
+  installmentNo    Int                 @map("installment_no")
+  dueDate          DateTime            @map("due_date")
+  amount           Decimal             @db.Decimal(10, 3)
+  status           AmcPaymentStatus    @default(PENDING)
+
+  // Payment tracking
+  paidAt           DateTime?           @map("paid_at")
+  paidAmount       Decimal?            @map("paid_amount") @db.Decimal(10, 3)
+  paymentMethod    PaymentMethod?      @map("payment_method")
+  paymentReference String?             @map("payment_reference")
+
+  // Link to invoice if generated
+  invoiceId        String?             @map("invoice_id")
+  invoice          Invoice?            @relation(fields: [invoiceId], references: [id])
+
+  notes            String?
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  @@unique([contractId, installmentNo])
+  @@map("amc_payment_schedules")
+  @@schema("fixitbh_ac")
+}
+
+enum AmcStatus {
+  DRAFT             // Contract being prepared
+  PENDING_APPROVAL  // Awaiting customer/manager approval
+  ACTIVE            // Contract is active
+  SUSPENDED         // Temporarily suspended (e.g., payment issues)
+  EXPIRED           // Contract period ended
+  CANCELLED         // Contract was cancelled
+  RENEWED           // Contract was renewed (new contract created)
+
+  @@schema("fixitbh_ac")
+}
+
+enum AmcPaymentTerms {
+  UPFRONT           // Full payment at start
+  MONTHLY           // Monthly installments
+  QUARTERLY         // Every 3 months
+  SEMI_ANNUAL       // Every 6 months
+  ANNUAL            // Once a year
+
+  @@schema("fixitbh_ac")
+}
+
+enum AmcServiceFrequency {
+  WEEKLY            // Every week
+  BI_WEEKLY         // Every 2 weeks
+  MONTHLY           // Once a month
+  BI_MONTHLY        // Every 2 months
+  QUARTERLY         // Every 3 months
+  SEMI_ANNUAL       // Every 6 months
+  ANNUAL            // Once a year
+
+  @@schema("fixitbh_ac")
+}
+
+enum AmcScheduleStatus {
+  SCHEDULED         // Planned
+  CONFIRMED         // Customer confirmed
+  IN_PROGRESS       // Work started
+  COMPLETED         // Work done
+  MISSED            // Was not performed
+  RESCHEDULED       // Moved to different date
+  CANCELLED         // Cancelled
+
+  @@schema("fixitbh_ac")
+}
+
+enum AmcPaymentStatus {
+  PENDING           // Not yet due
+  DUE               // Due for payment
+  PAID              // Fully paid
+  OVERDUE           // Past due date
+  PARTIALLY_PAID    // Partial payment received
+  WAIVED            // Payment waived
+
+  @@schema("fixitbh_ac")
+}
+
+// ==================== QUOTE MANAGEMENT (with versioning) ====================
+
+model Quote {
+  id               String            @id @default(cuid())
+  quoteNo          String            @unique @map("quote_no") // e.g., QUO-2025-0001
+
+  // Customer & Property
+  customerId       String            @map("customer_id")
+  customer         Customer          @relation(fields: [customerId], references: [id])
+  unitId           String?           @map("unit_id")
+  unit             Unit?             @relation(fields: [unitId], references: [id])
+  propertyId       String?           @map("property_id")
+  property         Property?         @relation(fields: [propertyId], references: [id])
+
+  // Optional link to service request
+  serviceRequestId String?           @map("service_request_id")
+
+  // Versioning
+  version          Int               @default(1)
+  parentQuoteId    String?           @map("parent_quote_id") // Original quote if this is a revision
+  parentQuote      Quote?            @relation("QuoteVersions", fields: [parentQuoteId], references: [id])
+  revisions        Quote[]           @relation("QuoteVersions")
+  isLatestVersion  Boolean           @default(true) @map("is_latest_version")
+
+  // Quote Details
+  title            String
+  description      String?           @db.Text
+  status           QuoteStatus       @default(DRAFT)
+
+  // Financial
+  subtotal         Decimal           @db.Decimal(10, 3)
+  taxRate          Decimal           @default(0) @map("tax_rate") @db.Decimal(5, 2) // e.g., 10.00 for 10%
+  taxAmount        Decimal           @default(0) @map("tax_amount") @db.Decimal(10, 3)
+  discountType     DiscountType?     @map("discount_type")
+  discountValue    Decimal           @default(0) @map("discount_value") @db.Decimal(10, 3)
+  discountAmount   Decimal           @default(0) @map("discount_amount") @db.Decimal(10, 3)
+  total            Decimal           @db.Decimal(10, 3)
+  currency         String            @default("BHD")
+
+  // Validity
+  validFrom        DateTime          @default(now()) @map("valid_from")
+  validUntil       DateTime          @map("valid_until")
+
+  // Terms
+  terms            String?           @db.Text
+  notes            String?           @db.Text
+  internalNotes    String?           @map("internal_notes") @db.Text
+
+  // Customer Response
+  customerResponse QuoteResponse?    @map("customer_response")
+  respondedAt      DateTime?         @map("responded_at")
+  responseNotes    String?           @map("response_notes") @db.Text
+
+  // Workflow
+  sentAt           DateTime?         @map("sent_at")
+  sentById         String?           @map("sent_by_id")
+  sentBy           User?             @relation("QuoteSentBy", fields: [sentById], references: [id])
+  approvedAt       DateTime?         @map("approved_at")
+  approvedById     String?           @map("approved_by_id")
+  approvedBy       User?             @relation("QuoteApprovedBy", fields: [approvedById], references: [id])
+  rejectedAt       DateTime?         @map("rejected_at")
+  rejectionReason  String?           @map("rejection_reason")
+
+  // Conversion to Invoice
+  convertedToInvoiceId String?       @unique @map("converted_to_invoice_id")
+  convertedToInvoice   Invoice?      @relation("QuoteToInvoice", fields: [convertedToInvoiceId], references: [id])
+  convertedAt      DateTime?         @map("converted_at")
+
+  // Audit
+  createdById      String            @map("created_by_id")
+  createdBy        User              @relation("QuoteCreatedBy", fields: [createdById], references: [id])
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  items            QuoteItem[]
+  attachments      QuoteAttachment[]
+  activities       QuoteActivity[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([parentQuoteId])
+  @@map("quotes")
+  @@schema("fixitbh_ac")
+}
+
+model QuoteItem {
+  id          String       @id @default(cuid())
+  quoteId     String       @map("quote_id")
+  quote       Quote        @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  // Item details
+  sortOrder   Int          @default(0) @map("sort_order")
+  itemType    QuoteItemType @default(SERVICE) @map("item_type")
+  name        String
+  description String?
+  sku         String?      // Stock Keeping Unit / Item code
+
+  // Quantity & Pricing
+  quantity    Decimal      @default(1) @db.Decimal(10, 3)
+  unit        String       @default("unit") // e.g., "hour", "piece", "sqm"
+  unitPrice   Decimal      @map("unit_price") @db.Decimal(10, 3)
+
+  // Discount per item
+  discountType   DiscountType? @map("discount_type")
+  discountValue  Decimal     @default(0) @map("discount_value") @db.Decimal(10, 3)
+  discountAmount Decimal     @default(0) @map("discount_amount") @db.Decimal(10, 3)
+
+  // Tax per item (optional - can use quote-level tax instead)
+  taxRate     Decimal      @default(0) @map("tax_rate") @db.Decimal(5, 2)
+  taxAmount   Decimal      @default(0) @map("tax_amount") @db.Decimal(10, 3)
+
+  // Totals
+  subtotal    Decimal      @db.Decimal(10, 3) // quantity * unitPrice
+  total       Decimal      @db.Decimal(10, 3) // subtotal - discount + tax
+
+  notes       String?
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  @@map("quote_items")
+  @@schema("fixitbh_ac")
+}
+
+model QuoteAttachment {
+  id          String   @id @default(cuid())
+  quoteId     String   @map("quote_id")
+  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  fileName    String   @map("file_name")
+  fileType    String   @map("file_type")
+  fileSize    Int      @map("file_size")
+  filePath    String   @map("file_path")
+  uploadedBy  String?  @map("uploaded_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("quote_attachments")
+  @@schema("fixitbh_ac")
+}
+
+model QuoteActivity {
+  id          String   @id @default(cuid())
+  quoteId     String   @map("quote_id")
+  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  action      String   // e.g., "CREATED", "SENT", "REVISED", "APPROVED", "REJECTED"
+  description String?
+  metadata    Json?    // Additional context
+  performedById String? @map("performed_by_id")
+  performedBy User?    @relation("QuoteActivityBy", fields: [performedById], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("quote_activities")
+  @@schema("fixitbh_ac")
+}
+
+enum QuoteStatus {
+  DRAFT           // Being prepared
+  PENDING_REVIEW  // Internal review
+  SENT            // Sent to customer
+  VIEWED          // Customer viewed
+  REVISED         // New version created (this version is old)
+  ACCEPTED        // Customer accepted
+  REJECTED        // Customer rejected
+  EXPIRED         // Validity period ended
+  CONVERTED       // Converted to invoice
+  CANCELLED       // Cancelled by staff
+
+  @@schema("fixitbh_ac")
+}
+
+enum QuoteItemType {
+  SERVICE         // Service charge
+  LABOR           // Labor/manpower
+  MATERIAL        // Parts/materials
+  EQUIPMENT       // Equipment rental
+  TRAVEL          // Travel/transport
+  DISCOUNT        // Discount line item
+  OTHER           // Other charges
+
+  @@schema("fixitbh_ac")
+}
+
+enum QuoteResponse {
+  PENDING         // No response yet
+  REVIEWING       // Customer is reviewing
+  NEGOTIATING     // Customer wants changes
+  ACCEPTED        // Customer accepted
+  REJECTED        // Customer rejected
+
+  @@schema("fixitbh_ac")
+}
+
+enum DiscountType {
+  PERCENTAGE      // e.g., 10% off
+  FIXED           // e.g., BHD 50 off
+
+  @@schema("fixitbh_ac")
+}
+
+// ==================== RECEIPT ====================
+
+model Receipt {
+  id              String        @id @default(cuid())
+  receiptNo       String        @unique @map("receipt_no") // e.g., RCP-2025-0001
+
+  // Link to Invoice
+  invoiceId       String        @map("invoice_id")
+  invoice         Invoice       @relation(fields: [invoiceId], references: [id])
+
+  // Link to Payment
+  paymentId       String?       @unique @map("payment_id")
+  payment         Payment?      @relation(fields: [paymentId], references: [id])
+
+  // Customer Info (denormalized for receipt printing)
+  customerId      String        @map("customer_id")
+  customer        Customer      @relation(fields: [customerId], references: [id])
+  customerName    String        @map("customer_name")
+  customerEmail   String?       @map("customer_email")
+  customerPhone   String?       @map("customer_phone")
+  customerAddress String?       @map("customer_address")
+
+  // Payment Details
+  amount          Decimal       @db.Decimal(10, 3)
+  paymentMethod   PaymentMethod @map("payment_method")
+  paymentDate     DateTime      @map("payment_date")
+  paymentReference String?      @map("payment_reference")
+
+  // Invoice Balance
+  invoiceTotal    Decimal       @map("invoice_total") @db.Decimal(10, 3)
+  previouslyPaid  Decimal       @default(0) @map("previously_paid") @db.Decimal(10, 3)
+  balanceAfter    Decimal       @map("balance_after") @db.Decimal(10, 3)
+
+  // Receipt Details
+  description     String?
+  notes           String?
+
+  // Printing/Sharing
+  printedAt       DateTime?     @map("printed_at")
+  printCount      Int           @default(0) @map("print_count")
+  emailedAt       DateTime?     @map("emailed_at")
+
+  // Void/Cancel
+  isVoided        Boolean       @default(false) @map("is_voided")
+  voidedAt        DateTime?     @map("voided_at")
+  voidedById      String?       @map("voided_by_id")
+  voidedBy        User?         @relation("ReceiptVoidedBy", fields: [voidedById], references: [id])
+  voidReason      String?       @map("void_reason")
+
+  // Audit
+  createdById     String        @map("created_by_id")
+  createdBy       User          @relation("ReceiptCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  @@index([invoiceId])
+  @@index([customerId])
+  @@index([paymentDate])
+  @@map("receipts")
+  @@schema("fixitbh_ac")
 }
 
 // ==================== AUDIT ====================

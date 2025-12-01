@@ -9,10 +9,11 @@ export const createCustomerSchema = z.object({
     lastNameAr: z.string().optional(),
     orgName: z.string().optional(),
     orgNameAr: z.string().optional(),
-    email: z.string().email(),
+    email: z.string().email().optional().or(z.literal('')),
     phone: z.string().optional(),
     altPhone: z.string().optional(),
     nationalId: z.string().optional(),
+    isActive: z.boolean().default(true),
   }).refine(data => {
     if (data.customerType === 'INDIVIDUAL') {
       return data.firstName && data.lastName;

@@ -32,7 +32,6 @@ export class PropertyService {
       },
       include: {
         type: true,
-        zone: true,
       },
     });
 
@@ -42,7 +41,7 @@ export class PropertyService {
         data: {
           customerId,
           propertyId: property.id,
-          ownershipType: ownershipType || 'OWNER',
+          ownershipType: (ownershipType as 'OWNER' | 'TENANT') || 'OWNER',
           isPrimary: true,
         },
       });
@@ -56,13 +55,15 @@ export class PropertyService {
       where: { id },
       include: {
         type: true,
-        zone: true,
         customers: {
           include: {
             customer: true,
           },
         },
-        rooms: true,
+        serviceRequests: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
 
@@ -120,7 +121,6 @@ export class PropertyService {
         orderBy: { createdAt: 'desc' },
         include: {
           type: true,
-          zone: true,
           customers: customerId ? {
             where: { customerId },
             include: { customer: true },
@@ -170,7 +170,6 @@ export class PropertyService {
       },
       include: {
         type: true,
-        zone: true,
       },
     });
 

@@ -6,7 +6,7 @@ export const createEmployeeSchema = z.object({
     lastName: z.string().min(1),
     firstNameAr: z.string().optional(),
     lastNameAr: z.string().optional(),
-    email: z.string().email(),
+    email: z.string().email().optional(),
     phone: z.string().optional(),
     nationalId: z.string().optional(),
     dateOfBirth: z.string().datetime().optional(),
@@ -18,6 +18,9 @@ export const createEmployeeSchema = z.object({
     sectionId: z.string().optional(),
     managerId: z.string().optional(),
     hasSystemAccess: z.boolean().default(false),
+    roleId: z.string().optional(),
+    zoneIds: z.array(z.string()).optional(),
+    isZoneHead: z.boolean().optional(),
   }),
 });
 

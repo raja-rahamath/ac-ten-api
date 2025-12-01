@@ -56,7 +56,7 @@ export class AuthService {
   }
 
   async register(input: RegisterInput) {
-    const { email, password, firstName, lastName } = input;
+    const { email, password, firstName, lastName, phone } = input;
 
     // Check if user exists
     const existingUser = await prisma.user.findUnique({
@@ -75,35 +75,62 @@ export class AuthService {
       where: { name: 'customer' },
     });
 
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        firstName,
-        lastName,
-        roleId: defaultRole?.id,
-        isActive: true,
-      },
-      include: {
-        role: true,
-      },
+    // Generate customer number (CUST-YYYYMMDD-XXXX format)
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+    const customerCount = await prisma.customer.count();
+    const customerNo = `CUST-${dateStr}-${String(customerCount + 1).padStart(4, '0')}`;
+
+    // Create user and customer in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Create user
+      const user = await tx.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          firstName,
+          lastName,
+          phone,
+          roleId: defaultRole?.id,
+          isActive: true,
+        },
+        include: {
+          role: true,
+        },
+      });
+
+      // Create customer record linked to user
+      await tx.customer.create({
+        data: {
+          userId: user.id,
+          customerNo,
+          customerType: 'INDIVIDUAL',
+          firstName,
+          lastName,
+          email,
+          phone,
+          isActive: true,
+          isVerified: false,
+        },
+      });
+
+      return user;
     });
 
     const tokens = this.generateTokens({
-      userId: user.id,
-      email: user.email,
-      role: user.role?.name || 'user',
+      userId: result.id,
+      email: result.email,
+      role: result.role?.name || 'user',
     });
 
     return {
       ...tokens,
       user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role?.name,
+        id: result.id,
+        email: result.email,
+        firstName: result.firstName,
+        lastName: result.lastName,
+        role: result.role?.name,
       },
     };
   }

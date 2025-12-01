@@ -30,6 +30,16 @@ export const config = {
   // AI Service
   aiServiceUrl: process.env.AI_SERVICE_URL || 'http://localhost:8000',
 
+  // SMTP/Email
+  smtp: {
+    host: process.env.SMTP_HOST || '',
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    secure: process.env.SMTP_SECURE === 'true',
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+    from: process.env.EMAIL_FROM || 'noreply@agentcare.com',
+  },
+
   // Internal Service API Key (for service-to-service communication)
   internalApiKey: process.env.INTERNAL_API_KEY || 'agentcare-internal-dev-key-2024',
 

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { EmployeeController } from './employee.controller.js';
 import { authenticate, authorize } from '../../middleware/authenticate.js';
 import { validate } from '../../middleware/validate.js';
@@ -12,8 +13,46 @@ import {
 const router = Router();
 const controller = new EmployeeController();
 
+// Configure multer for memory storage
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedMimes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+    ];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only Excel files are allowed'));
+    }
+  },
+});
+
 router.use(authenticate);
 
+// Export/Import routes (must come before /:id routes)
+router.get(
+  '/export/excel',
+  authorize('employees:read'),
+  controller.exportExcel.bind(controller)
+);
+
+router.get(
+  '/import/template',
+  authorize('employees:read'),
+  controller.getImportTemplate.bind(controller)
+);
+
+router.post(
+  '/import/excel',
+  authorize('employees:write'),
+  upload.single('file'),
+  controller.importExcel.bind(controller)
+);
+
+// CRUD routes
 router.post(
   '/',
   authorize('employees:write'),

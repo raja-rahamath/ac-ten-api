@@ -1,0 +1,49 @@
+import { Router } from 'express';
+import { AmcController } from './amc.controller.js';
+import { authenticate, authorize } from '../../middleware/authenticate.js';
+
+const router = Router();
+const controller = new AmcController();
+
+// All routes require authentication
+router.use(authenticate);
+
+// Dashboard Stats
+router.get('/stats', controller.getDashboardStats.bind(controller));
+
+// Schedules (global - not tied to specific contract)
+router.get('/schedules', controller.getSchedules.bind(controller));
+router.patch('/schedules/:scheduleId/status', controller.updateScheduleStatus.bind(controller));
+
+// Payments (global - not tied to specific contract)
+router.get('/payments', controller.getPayments.bind(controller));
+router.post('/payments/:paymentId/record', controller.recordPayment.bind(controller));
+
+// Contract CRUD
+router.post('/', controller.create.bind(controller));
+router.get('/', controller.getAll.bind(controller));
+router.get('/:id', controller.getById.bind(controller));
+router.patch('/:id', controller.update.bind(controller));
+router.delete('/:id', controller.delete.bind(controller));
+
+// Contract Status
+router.patch('/:id/status', controller.updateStatus.bind(controller));
+
+// Contract Properties
+router.post('/:id/properties', controller.addProperty.bind(controller));
+router.delete('/:id/properties/:propertyId', controller.removeProperty.bind(controller));
+
+// Contract Services
+router.post('/:id/services', controller.addService.bind(controller));
+router.delete('/:id/services/:serviceId', controller.removeService.bind(controller));
+
+// Contract Schedule Generation
+router.post('/:id/schedules/generate', controller.generateSchedules.bind(controller));
+
+// Contract Payment Schedule Generation
+router.post('/:id/payments/generate', controller.generatePaymentSchedule.bind(controller));
+
+// Contract Renewal
+router.post('/:id/renew', controller.renewContract.bind(controller));
+
+export default router;

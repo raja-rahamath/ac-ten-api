@@ -10,13 +10,15 @@ function generateCustomerNo(): string {
 
 export class CustomerService {
   async create(input: CreateCustomerInput) {
-    // Check if email exists
-    const existing = await prisma.customer.findUnique({
-      where: { email: input.email },
-    });
+    // Check if email exists (only if email is provided)
+    if (input.email) {
+      const existing = await prisma.customer.findUnique({
+        where: { email: input.email },
+      });
 
-    if (existing) {
-      throw new ConflictError('Customer with this email already exists');
+      if (existing) {
+        throw new ConflictError('Customer with this email already exists');
+      }
     }
 
     const customer = await prisma.customer.create({

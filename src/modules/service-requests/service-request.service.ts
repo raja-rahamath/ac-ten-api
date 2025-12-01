@@ -110,7 +110,7 @@ export class ServiceRequestService {
   }
 
   async findAll(query: ListServiceRequestsQuery) {
-    const { search, status, priority, customerId, assignedEmployeeId, zoneId } = query;
+    const { search, status, priority, customerId, assignedEmployeeId, zoneId, zoneIds } = query;
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -129,7 +129,16 @@ export class ServiceRequestService {
     if (priority) where.priority = priority;
     if (customerId) where.customerId = customerId;
     if (assignedEmployeeId) where.assignedToId = assignedEmployeeId;
-    if (zoneId) where.zoneId = zoneId;
+
+    // Support both single zoneId and multiple zoneIds (comma-separated)
+    if (zoneIds) {
+      const zoneIdArray = zoneIds.split(',').map((id) => id.trim()).filter(Boolean);
+      if (zoneIdArray.length > 0) {
+        where.zoneId = { in: zoneIdArray };
+      }
+    } else if (zoneId) {
+      where.zoneId = zoneId;
+    }
 
     const [serviceRequests, total] = await Promise.all([
       prisma.serviceRequest.findMany({

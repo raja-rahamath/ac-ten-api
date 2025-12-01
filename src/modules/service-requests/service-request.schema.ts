@@ -58,6 +58,7 @@ export const listServiceRequestsSchema = z.object({
     customerId: z.string().optional(),
     assignedEmployeeId: z.string().optional(),
     zoneId: z.string().optional(),
+    zoneIds: z.string().optional(), // Comma-separated zone IDs for technicians
   }),
 });
 
