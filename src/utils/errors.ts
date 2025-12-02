@@ -45,3 +45,21 @@ export class ValidationError extends AppError {
     super(message, 422, 'VALIDATION_ERROR');
   }
 }
+
+export class TooManyRequestsError extends AppError {
+  constructor(message: string = 'Too many requests') {
+    super(message, 429, 'TOO_MANY_REQUESTS');
+  }
+}
+
+export class ServiceUnavailableError extends AppError {
+  constructor(message: string = 'Service temporarily unavailable') {
+    super(message, 503, 'SERVICE_UNAVAILABLE');
+  }
+}
+
+export class InternalServerError extends AppError {
+  constructor(message: string = 'Internal server error') {
+    super(message, 500, 'INTERNAL_ERROR');
+  }
+}

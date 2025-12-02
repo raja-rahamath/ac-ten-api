@@ -3,12 +3,15 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import { pinoHttp } from 'pino-http';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './config/swagger.js';
 
 import { config } from './config/index.js';
 import { logger } from './config/logger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { notFoundHandler } from './middleware/notFoundHandler.js';
 import { apiLimiter, authLimiter } from './middleware/rateLimiter.js';
+import { sanitize } from './middleware/sanitize.js';
 
 // Import routes
 import authRoutes from './modules/auth/auth.routes.js';
@@ -96,11 +99,26 @@ export function createApp(): Express {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+  // XSS sanitization - sanitize all incoming request data
+  app.use(sanitize);
+
   // Request logging
   app.use(pinoHttp({ logger }));
 
   // Health check (no auth required)
   app.use('/health', healthRoutes);
+
+  // API Documentation (no auth required)
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'AgentCare API Documentation',
+  }));
+
+  // JSON OpenAPI spec endpoint
+  app.get('/api-docs.json', (_req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(swaggerSpec);
+  });
 
   // API routes
   const apiRouter = express.Router();
