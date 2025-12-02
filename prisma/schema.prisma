@@ -297,6 +297,17 @@ model Employee {
   // Site Visit Relations
   siteVisits SiteVisit[] @relation("SiteVisitAssignee")
 
+  // Work Order Relations
+  workOrdersCreated   WorkOrder[]          @relation("WorkOrderCreatedBy")
+  workOrderTeams      WorkOrderTeam[]
+  workOrderLabor      WorkOrderLabor[]
+  workOrderChecklists WorkOrderChecklist[]
+  workOrderPhotos     WorkOrderPhoto[]
+  workOrderActivities WorkOrderActivity[]
+
+  // Notification Relations
+  notifications Notification[]
+
   @@map("employees")
   @@schema("fixitbh_ac")
 }
@@ -604,6 +615,12 @@ model Customer {
   amcContracts    AmcContract[]
   quotes          Quote[]
   receipts        Receipt[]
+
+  // Work Order Relations
+  workOrders    WorkOrder[]
+  reviews       CustomerReview[]
+  notifications Notification[]
+  memberships   CustomerMembership[]
 
   @@map("customers")
   @@schema("fixitbh_ac")
@@ -1209,6 +1226,8 @@ model ServiceRequest {
   // New workflow relations
   siteVisits SiteVisit[]
   estimates  Estimate[]
+  workOrders WorkOrder[]
+  reviews    CustomerReview[]
 
   @@map("service_requests")
   @@schema("fixitbh_ac")
@@ -1483,6 +1502,7 @@ model Estimate {
   items      EstimateItem[]
   laborItems EstimateLaborItem[]
   activities EstimateActivity[]
+  workOrders WorkOrder[]
 
   @@index([serviceRequestId])
   @@index([status])
@@ -1770,6 +1790,7 @@ model InventoryItem {
   materialUsage  MaterialUsage[]
   stockMovements StockMovement[]
   estimateItems  EstimateItem[]
+  workOrderItems WorkOrderItem[]
 
   @@map("inventory_items")
   @@schema("fixitbh_ac")
@@ -1933,25 +1954,34 @@ enum PaymentMethod {
 // ==================== NOTIFICATION ====================
 
 model NotificationTemplate {
-  id          String              @id @default(cuid())
-  name        String              @unique
-  type        NotificationType
-  channel     NotificationChannel
-  subject     String?
-  subjectAr   String?             @map("subject_ar")
-  body        String
-  bodyAr      String?             @map("body_ar")
-  isActive    Boolean             @default(true) @map("is_active")
-  createdAt   DateTime            @default(now()) @map("audit_create_date")
-  createdById String?             @map("audit_create_by")
-  updatedAt   DateTime            @updatedAt @map("audit_change_date")
-  updatedById String?             @map("audit_change_by")
+  id      String              @id @default(cuid())
+  name    String              @unique
+  type    NotificationType
+  channel NotificationChannel
+
+  // Content
+  title     String?
+  titleAr   String? @map("title_ar")
+  subject   String?
+  subjectAr String? @map("subject_ar")
+  body      String // Supports placeholders like {{customer_name}}
+  bodyAr    String? @map("body_ar")
+
+  // Settings
+  isActive  Boolean @default(true) @map("is_active")
+  isDefault Boolean @default(false) @map("is_default")
+
+  createdAt   DateTime @default(now()) @map("audit_create_date")
+  createdById String?  @map("audit_create_by")
+  updatedAt   DateTime @updatedAt @map("audit_change_date")
+  updatedById String?  @map("audit_change_by")
 
   @@map("notification_templates")
   @@schema("fixitbh_ac")
 }
 
 enum NotificationType {
+  // Legacy
   REQUEST_CREATED
   REQUEST_ASSIGNED
   REQUEST_SCHEDULED
@@ -1963,6 +1993,25 @@ enum NotificationType {
   PAYMENT_RECEIVED
   SLA_WARNING
   SLA_BREACH
+  // Appointment
+  APPOINTMENT_REMINDER
+  APPOINTMENT_CONFIRMATION
+  APPOINTMENT_RESCHEDULED
+  APPOINTMENT_CANCELLED
+  // Technician
+  TECHNICIAN_ASSIGNED
+  TECHNICIAN_EN_ROUTE
+  TECHNICIAN_ARRIVED
+  // Work Order
+  WORK_STARTED
+  WORK_COMPLETED
+  // Quote/Invoice
+  QUOTE_SENT
+  PAYMENT_REMINDER
+  // Review
+  REVIEW_REQUEST
+  // General
+  GENERAL
 
   @@schema("fixitbh_ac")
 }
@@ -1972,6 +2021,19 @@ enum NotificationChannel {
   SMS
   PUSH
   IN_APP
+  WHATSAPP
+
+  @@schema("fixitbh_ac")
+}
+
+enum NotificationStatus {
+  PENDING
+  SCHEDULED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  CANCELLED
 
   @@schema("fixitbh_ac")
 }
@@ -2284,6 +2346,7 @@ model Quote {
   attachments  QuoteAttachment[]
   activities   QuoteActivity[]
   fromEstimate Estimate?         @relation("EstimateToQuote")
+  workOrders   WorkOrder[]
 
   @@index([customerId])
   @@index([status])
@@ -2485,5 +2548,482 @@ model AuditLog {
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@map("audit_logs")
+  @@schema("fixitbh_ac")
+}
+
+// ==================== WORK ORDER ====================
+
+model WorkOrder {
+  id               String         @id @default(cuid())
+  workOrderNo      String         @unique @map("work_order_no") // e.g., WO-2025-0001
+  serviceRequestId String         @map("service_request_id")
+  serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id])
+  quoteId          String?        @map("quote_id")
+  quote            Quote?         @relation(fields: [quoteId], references: [id])
+  estimateId       String?        @map("estimate_id")
+  estimate         Estimate?      @relation(fields: [estimateId], references: [id])
+  customerId       String         @map("customer_id")
+  customer         Customer       @relation(fields: [customerId], references: [id])
+
+  // Work Details
+  title               String
+  description         String?
+  scope               String? // What work needs to be done
+  specialInstructions String? @map("special_instructions")
+
+  // Scheduling
+  scheduledDate     DateTime @map("scheduled_date")
+  scheduledTime     String?  @map("scheduled_time")
+  estimatedDuration Int?     @map("estimated_duration") // in minutes
+
+  // Execution
+  startedAt      DateTime? @map("started_at")
+  completedAt    DateTime? @map("completed_at")
+  actualDuration Int?      @map("actual_duration") // in minutes
+
+  // Status
+  status   WorkOrderStatus @default(PENDING)
+  priority Priority        @default(MEDIUM)
+
+  // Completion Details
+  workPerformed    String? @map("work_performed")
+  technicianNotes  String? @map("technician_notes")
+  customerFeedback String? @map("customer_feedback")
+
+  // Signatures
+  technicianSignature String?   @map("technician_signature") // Base64 or URL
+  customerSignature   String?   @map("customer_signature")
+  signedAt            DateTime? @map("signed_at")
+
+  // Financials
+  laborCost      Decimal @default(0) @map("labor_cost") @db.Decimal(10, 3)
+  materialCost   Decimal @default(0) @map("material_cost") @db.Decimal(10, 3)
+  additionalCost Decimal @default(0) @map("additional_cost") @db.Decimal(10, 3)
+  totalCost      Decimal @default(0) @map("total_cost") @db.Decimal(10, 3)
+
+  // Audit
+  createdById String   @map("created_by_id")
+  createdBy   Employee @relation("WorkOrderCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now()) @map("audit_create_date")
+  updatedAt   DateTime @updatedAt @map("audit_change_date")
+  updatedById String?  @map("audit_change_by")
+
+  // Relations
+  team         WorkOrderTeam[]
+  items        WorkOrderItem[]
+  laborEntries WorkOrderLabor[]
+  checklists   WorkOrderChecklist[]
+  photos       WorkOrderPhoto[]
+  activities   WorkOrderActivity[]
+  reviews      CustomerReview[]
+
+  @@index([serviceRequestId])
+  @@index([customerId])
+  @@index([status])
+  @@index([scheduledDate])
+  @@map("work_orders")
+  @@schema("fixitbh_ac")
+}
+
+enum WorkOrderStatus {
+  PENDING // Created but not scheduled
+  SCHEDULED // Assigned to team
+  CONFIRMED // Customer confirmed appointment
+  EN_ROUTE // Technician on the way
+  IN_PROGRESS // Work started
+  ON_HOLD // Paused (waiting for parts, customer request)
+  COMPLETED // Work finished
+  CANCELLED // Cancelled
+  REQUIRES_FOLLOWUP // Needs additional work
+
+  @@schema("fixitbh_ac")
+}
+
+// Team assigned to work order
+model WorkOrderTeam {
+  workOrderId String    @map("work_order_id")
+  employeeId  String    @map("employee_id")
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  role        String? // e.g., "Lead Technician", "Helper"
+  isLead      Boolean   @default(false) @map("is_lead")
+  assignedAt  DateTime  @default(now()) @map("assigned_at")
+  createdAt   DateTime  @default(now()) @map("audit_create_date")
+  createdById String?   @map("audit_create_by")
+
+  @@id([workOrderId, employeeId])
+  @@map("work_order_team")
+  @@schema("fixitbh_ac")
+}
+
+// Materials/parts used in work order
+model WorkOrderItem {
+  id              String         @id @default(cuid())
+  workOrderId     String         @map("work_order_id")
+  workOrder       WorkOrder      @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  inventoryItemId String?        @map("inventory_item_id")
+  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id])
+
+  name        String
+  description String?
+  quantity    Decimal @db.Decimal(10, 2)
+  unit        String  @default("piece")
+  unitCost    Decimal @map("unit_cost") @db.Decimal(10, 3)
+  totalCost   Decimal @map("total_cost") @db.Decimal(10, 3)
+
+  isFromEstimate Boolean @default(false) @map("is_from_estimate")
+  isAdditional   Boolean @default(false) @map("is_additional") // Added during work
+
+  createdAt   DateTime @default(now()) @map("audit_create_date")
+  createdById String?  @map("audit_create_by")
+
+  @@map("work_order_items")
+  @@schema("fixitbh_ac")
+}
+
+// Time tracking for technicians
+model WorkOrderLabor {
+  id          String    @id @default(cuid())
+  workOrderId String    @map("work_order_id")
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  employeeId  String    @map("employee_id")
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+
+  // Time tracking
+  clockInAt    DateTime  @map("clock_in_at")
+  clockOutAt   DateTime? @map("clock_out_at")
+  breakMinutes Int       @default(0) @map("break_minutes")
+  totalMinutes Int?      @map("total_minutes")
+
+  // Travel time
+  travelStartAt DateTime? @map("travel_start_at")
+  arrivedAt     DateTime? @map("arrived_at")
+  travelMinutes Int?      @map("travel_minutes")
+
+  // Cost
+  hourlyRate Decimal  @map("hourly_rate") @db.Decimal(10, 3)
+  totalCost  Decimal? @map("total_cost") @db.Decimal(10, 3)
+
+  notes String?
+
+  createdAt   DateTime @default(now()) @map("audit_create_date")
+  createdById String?  @map("audit_create_by")
+
+  @@map("work_order_labor")
+  @@schema("fixitbh_ac")
+}
+
+// Checklist for work completion
+model WorkOrderChecklist {
+  id          String    @id @default(cuid())
+  workOrderId String    @map("work_order_id")
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  // From template or custom
+  templateId String? @map("template_id")
+
+  sortOrder  Int     @default(0) @map("sort_order")
+  category   String? // e.g., "Pre-Work", "Safety", "Quality", "Post-Work"
+  item       String // The checklist item text
+  isRequired Boolean @default(true) @map("is_required")
+
+  // Completion
+  isCompleted   Boolean   @default(false) @map("is_completed")
+  completedAt   DateTime? @map("completed_at")
+  completedById String?   @map("completed_by_id")
+  completedBy   Employee? @relation(fields: [completedById], references: [id])
+
+  // Response
+  response String? // Text response if needed
+  value    String? // For measurements/readings
+
+  notes    String?
+  photoUrl String? @map("photo_url") // If photo required for this item
+
+  createdAt   DateTime @default(now()) @map("audit_create_date")
+  createdById String?  @map("audit_create_by")
+
+  @@map("work_order_checklists")
+  @@schema("fixitbh_ac")
+}
+
+// Photos for work order (before/during/after)
+model WorkOrderPhoto {
+  id          String    @id @default(cuid())
+  workOrderId String    @map("work_order_id")
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  photoType    PhotoType @map("photo_type")
+  url          String
+  thumbnailUrl String?   @map("thumbnail_url")
+  caption      String?
+
+  takenAt   DateTime @default(now()) @map("taken_at")
+  takenById String   @map("taken_by_id")
+  takenBy   Employee @relation(fields: [takenById], references: [id])
+
+  // GPS location when photo was taken
+  latitude  Decimal? @db.Decimal(10, 8)
+  longitude Decimal? @db.Decimal(11, 8)
+
+  createdAt   DateTime @default(now()) @map("audit_create_date")
+  createdById String?  @map("audit_create_by")
+
+  @@map("work_order_photos")
+  @@schema("fixitbh_ac")
+}
+
+enum PhotoType {
+  BEFORE // Before work starts
+  DURING // During work
+  AFTER // After completion
+  ISSUE // Problem found
+  SIGNATURE // Signature capture
+  OTHER
+
+  @@schema("fixitbh_ac")
+}
+
+// Work order activity log
+model WorkOrderActivity {
+  id          String    @id @default(cuid())
+  workOrderId String    @map("work_order_id")
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  action      String // e.g., "CREATED", "ASSIGNED", "STARTED", "COMPLETED"
+  description String
+  metadata    Json?
+
+  performedById String   @map("performed_by_id")
+  performedBy   Employee @relation(fields: [performedById], references: [id])
+  performedAt   DateTime @default(now()) @map("performed_at")
+
+  @@map("work_order_activities")
+  @@schema("fixitbh_ac")
+}
+
+// ==================== NOTIFICATION ====================
+
+model Notification {
+  id String @id @default(cuid())
+
+  // Recipient
+  recipientType RecipientType @map("recipient_type")
+  customerId    String?       @map("customer_id")
+  customer      Customer?     @relation(fields: [customerId], references: [id])
+  employeeId    String?       @map("employee_id")
+  employee      Employee?     @relation(fields: [employeeId], references: [id])
+  userId        String?       @map("user_id")
+
+  // Channel
+  channel NotificationChannel
+
+  // Content
+  type       NotificationType
+  title      String
+  message    String
+  templateId String?          @map("template_id")
+
+  // Reference
+  referenceType String? @map("reference_type") // e.g., "WorkOrder", "ServiceRequest"
+  referenceId   String? @map("reference_id")
+
+  // Delivery
+  status        NotificationStatus @default(PENDING)
+  scheduledFor  DateTime?          @map("scheduled_for")
+  sentAt        DateTime?          @map("sent_at")
+  deliveredAt   DateTime?          @map("delivered_at")
+  readAt        DateTime?          @map("read_at")
+  failedAt      DateTime?          @map("failed_at")
+  failureReason String?            @map("failure_reason")
+
+  // For SMS
+  phoneNumber String? @map("phone_number")
+
+  // For Email
+  email   String?
+  subject String?
+
+  // Retry
+  retryCount Int @default(0) @map("retry_count")
+  maxRetries Int @default(3) @map("max_retries")
+
+  // Metadata
+  metadata Json?
+
+  createdAt   DateTime @default(now()) @map("audit_create_date")
+  createdById String?  @map("audit_create_by")
+
+  @@index([customerId])
+  @@index([employeeId])
+  @@index([status])
+  @@index([scheduledFor])
+  @@map("notifications")
+  @@schema("fixitbh_ac")
+}
+
+enum RecipientType {
+  CUSTOMER
+  EMPLOYEE
+  USER
+
+  @@schema("fixitbh_ac")
+}
+
+// ==================== CUSTOMER REVIEW ====================
+
+model CustomerReview {
+  id String @id @default(cuid())
+
+  // Links
+  serviceRequestId String?         @map("service_request_id")
+  serviceRequest   ServiceRequest? @relation(fields: [serviceRequestId], references: [id])
+  workOrderId      String?         @map("work_order_id")
+  workOrder        WorkOrder?      @relation(fields: [workOrderId], references: [id])
+  customerId       String          @map("customer_id")
+  customer         Customer        @relation(fields: [customerId], references: [id])
+
+  // Ratings (1-5 stars)
+  overallRating         Int  @map("overall_rating") // 1-5
+  qualityRating         Int? @map("quality_rating")
+  timelinessRating      Int? @map("timeliness_rating")
+  professionalismRating Int? @map("professionalism_rating")
+  valueRating           Int? @map("value_rating")
+
+  // Feedback
+  comment        String?
+  wouldRecommend Boolean? @map("would_recommend")
+
+  // Response from company
+  responseText  String?   @map("response_text")
+  respondedAt   DateTime? @map("responded_at")
+  respondedById String?   @map("responded_by_id")
+
+  // Visibility
+  isPublic   Boolean @default(true) @map("is_public")
+  isVerified Boolean @default(true) @map("is_verified") // Verified customer
+
+  // Source
+  source ReviewSource @default(PORTAL)
+
+  createdAt   DateTime @default(now()) @map("audit_create_date")
+  createdById String?  @map("audit_create_by")
+  updatedAt   DateTime @updatedAt @map("audit_change_date")
+  updatedById String?  @map("audit_change_by")
+
+  @@index([customerId])
+  @@index([overallRating])
+  @@map("customer_reviews")
+  @@schema("fixitbh_ac")
+}
+
+enum ReviewSource {
+  PORTAL // Customer portal
+  EMAIL_LINK // Email follow-up link
+  SMS_LINK // SMS follow-up link
+  MANUAL // Entered by staff
+  GOOGLE // Imported from Google
+  SOCIAL // Social media
+
+  @@schema("fixitbh_ac")
+}
+
+// ==================== MEMBERSHIP/SUBSCRIPTION ====================
+
+model MembershipPlan {
+  id            String  @id @default(cuid())
+  name          String
+  nameAr        String? @map("name_ar")
+  code          String  @unique // e.g., "BASIC", "PREMIUM", "GOLD"
+  description   String?
+  descriptionAr String? @map("description_ar")
+
+  // Pricing
+  price        Decimal      @db.Decimal(10, 3)
+  billingCycle BillingCycle @map("billing_cycle")
+
+  // Features
+  features Json? // Array of features included
+
+  // Discounts
+  serviceDiscount   Decimal @default(0) @map("service_discount") @db.Decimal(5, 2) // % off services
+  partsDiscount     Decimal @default(0) @map("parts_discount") @db.Decimal(5, 2) // % off parts
+  priorityService   Boolean @default(false) @map("priority_service")
+  freeVisitsPerYear Int     @default(0) @map("free_visits_per_year")
+
+  // Settings
+  isActive  Boolean @default(true) @map("is_active")
+  sortOrder Int     @default(0) @map("sort_order")
+
+  createdAt   DateTime @default(now()) @map("audit_create_date")
+  createdById String?  @map("audit_create_by")
+  updatedAt   DateTime @updatedAt @map("audit_change_date")
+  updatedById String?  @map("audit_change_by")
+
+  // Relations
+  subscriptions CustomerMembership[]
+
+  @@map("membership_plans")
+  @@schema("fixitbh_ac")
+}
+
+enum BillingCycle {
+  MONTHLY
+  QUARTERLY
+  SEMI_ANNUAL
+  ANNUAL
+
+  @@schema("fixitbh_ac")
+}
+
+model CustomerMembership {
+  id         String         @id @default(cuid())
+  customerId String         @map("customer_id")
+  customer   Customer       @relation(fields: [customerId], references: [id])
+  planId     String         @map("plan_id")
+  plan       MembershipPlan @relation(fields: [planId], references: [id])
+
+  // Subscription period
+  startDate DateTime @map("start_date")
+  endDate   DateTime @map("end_date")
+
+  // Status
+  status MembershipStatus @default(ACTIVE)
+
+  // Billing
+  lastBilledAt  DateTime? @map("last_billed_at")
+  nextBillingAt DateTime? @map("next_billing_at")
+
+  // Auto-renewal
+  autoRenew Boolean @default(true) @map("auto_renew")
+
+  // Payment method
+  paymentMethod String? @map("payment_method")
+
+  // Usage tracking
+  freeVisitsUsed Int @default(0) @map("free_visits_used")
+
+  // Cancellation
+  cancelledAt        DateTime? @map("cancelled_at")
+  cancellationReason String?   @map("cancellation_reason")
+
+  createdAt   DateTime @default(now()) @map("audit_create_date")
+  createdById String?  @map("audit_create_by")
+  updatedAt   DateTime @updatedAt @map("audit_change_date")
+  updatedById String?  @map("audit_change_by")
+
+  @@index([customerId])
+  @@index([status])
+  @@map("customer_memberships")
+  @@schema("fixitbh_ac")
+}
+
+enum MembershipStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  SUSPENDED
+  PENDING_PAYMENT
+
   @@schema("fixitbh_ac")
 }
