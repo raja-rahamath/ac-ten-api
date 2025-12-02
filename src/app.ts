@@ -60,6 +60,7 @@ import siteVisitRoutes from './modules/site-visits/site-visit.routes.js';
 import workOrderRoutes from './modules/work-orders/work-order.routes.js';
 import notificationRoutes from './modules/notifications/notification.routes.js';
 import membershipRoutes from './modules/memberships/membership.routes.js';
+import reviewRoutes from './modules/reviews/review.routes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -177,6 +178,7 @@ export function createApp(): Express {
   apiRouter.use('/work-orders', workOrderRoutes);
   apiRouter.use('/notifications', notificationRoutes);
   apiRouter.use('/memberships', membershipRoutes);
+  apiRouter.use('/reviews', reviewRoutes);
 
   app.use(`/api/${config.apiVersion}`, apiRouter);
 
