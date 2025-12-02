@@ -35,9 +35,18 @@ export class CustomerService {
     const customer = await prisma.customer.findUnique({
       where: { id },
       include: {
-        properties: {
+        units: {
           include: {
-            property: true,
+            unit: {
+              include: {
+                building: {
+                  include: {
+                    zone: true,
+                  },
+                },
+                type: true,
+              },
+            },
           },
         },
         serviceRequests: {
@@ -54,6 +63,61 @@ export class CustomerService {
     return customer;
   }
 
+  async linkUnit(customerId: string, unitId: string, ownershipType: 'OWNER' | 'TENANT' = 'TENANT', isPrimary: boolean = false) {
+    // Verify customer exists
+    const customer = await prisma.customer.findUnique({ where: { id: customerId } });
+    if (!customer) {
+      throw new NotFoundError('Customer not found');
+    }
+
+    // Verify unit exists
+    const unit = await prisma.unit.findUnique({ where: { id: unitId } });
+    if (!unit) {
+      throw new NotFoundError('Unit not found');
+    }
+
+    // Create or update the link
+    const customerUnit = await prisma.customerUnit.upsert({
+      where: {
+        customerId_unitId: { customerId, unitId },
+      },
+      update: {
+        ownershipType,
+        isPrimary,
+      },
+      create: {
+        customerId,
+        unitId,
+        ownershipType,
+        isPrimary,
+      },
+      include: {
+        unit: {
+          include: {
+            building: {
+              include: {
+                zone: true,
+              },
+            },
+            type: true,
+          },
+        },
+      },
+    });
+
+    return customerUnit;
+  }
+
+  async unlinkUnit(customerId: string, unitId: string) {
+    await prisma.customerUnit.delete({
+      where: {
+        customerId_unitId: { customerId, unitId },
+      },
+    });
+
+    return { message: 'Unit unlinked successfully' };
+  }
+
   async findAll(query: ListCustomersQuery) {
     const { search, customerType, isActive } = query;
     const page = query.page ?? 1;
@@ -68,6 +132,7 @@ export class CustomerService {
         { lastName: { contains: search, mode: 'insensitive' } },
         { orgName: { contains: search, mode: 'insensitive' } },
         { email: { contains: search, mode: 'insensitive' } },
+        { phone: { contains: search, mode: 'insensitive' } },
         { customerNo: { contains: search, mode: 'insensitive' } },
       ];
     }

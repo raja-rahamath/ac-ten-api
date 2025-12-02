@@ -64,4 +64,28 @@ export class CompanyController {
       next(error);
     }
   }
+
+  async getPrimary(req: Request, res: Response, next: NextFunction) {
+    try {
+      const company = await companyService.getPrimary();
+      res.json({
+        success: true,
+        data: company,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async setPrimary(req: Request, res: Response, next: NextFunction) {
+    try {
+      const company = await companyService.setPrimary(req.params.id);
+      res.json({
+        success: true,
+        data: company,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

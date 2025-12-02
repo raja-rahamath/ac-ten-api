@@ -105,4 +105,81 @@ export class ServiceRequestController {
       next(error);
     }
   }
+
+  // Attachment methods
+  async addAttachment(req: Request, res: Response, next: NextFunction) {
+    try {
+      const attachment = await serviceRequestService.addAttachment(
+        req.params.id,
+        req.body,
+        req.user?.id
+      );
+      res.status(201).json({
+        success: true,
+        data: attachment,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getAttachments(req: Request, res: Response, next: NextFunction) {
+    try {
+      const attachments = await serviceRequestService.getAttachments(req.params.id);
+      res.json({
+        success: true,
+        data: attachments,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteAttachment(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await serviceRequestService.deleteAttachment(
+        req.params.id,
+        req.params.attachmentId,
+        req.user?.id
+      );
+      res.json({
+        success: true,
+        ...result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Asset linking methods
+  async linkAsset(req: Request, res: Response, next: NextFunction) {
+    try {
+      const serviceRequest = await serviceRequestService.linkAsset(
+        req.params.id,
+        req.body.assetId,
+        req.user?.id
+      );
+      res.json({
+        success: true,
+        data: serviceRequest,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async unlinkAsset(req: Request, res: Response, next: NextFunction) {
+    try {
+      const serviceRequest = await serviceRequestService.unlinkAsset(
+        req.params.id,
+        req.user?.id
+      );
+      res.json({
+        success: true,
+        data: serviceRequest,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

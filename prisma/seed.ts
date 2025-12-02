@@ -48,6 +48,10 @@ async function main() {
     // Settings
     createPermission('settings', 'read', 'View settings'),
     createPermission('settings', 'write', 'Update settings'),
+    // Action Templates
+    createPermission('action-templates', 'read', 'View action templates'),
+    createPermission('action-templates', 'write', 'Create/update action templates'),
+    createPermission('action-templates', 'delete', 'Delete action templates'),
   ]);
 
   console.log(`✅ Created ${permissions.length} permissions`);
@@ -323,6 +327,25 @@ async function main() {
   });
 
   console.log(`✅ Created demo admin user: ${adminUser.email}`);
+
+  // Create product admin user (system user - not linked to employee, not shown in user list)
+  // This user is for product support team to help tenants who lose their passwords
+  const productAdminUser = await prisma.user.upsert({
+    where: { email: 'prdadmin@agentcare.com' },
+    update: { password: hashedPassword },
+    create: {
+      email: 'prdadmin@agentcare.com',
+      password: hashedPassword,
+      firstName: 'Product',
+      lastName: 'Admin',
+      roleId: adminRole.id,
+      isActive: true,
+      isVerified: true,
+      isSystemUser: true, // This user won't appear in the user list
+    },
+  });
+
+  console.log(`✅ Created product admin user: ${productAdminUser.email} (system user)`);
 
   // Create an employee record for the admin
   await prisma.employee.upsert({
@@ -641,6 +664,49 @@ async function main() {
   });
 
   console.log('✅ Created zones: Juffair Zone, Seef Zone');
+
+  // Assign admin employee as zone head for both zones (for auto-assignment to work)
+  const adminEmpForZone = await prisma.employee.findFirst({
+    where: { email: 'admin@fixitbh.com' },
+  });
+
+  if (adminEmpForZone) {
+    await prisma.employeeZone.upsert({
+      where: {
+        employeeId_zoneId: {
+          employeeId: adminEmpForZone.id,
+          zoneId: juffairZone.id,
+        },
+      },
+      update: { role: 'PRIMARY_HEAD' },
+      create: {
+        employeeId: adminEmpForZone.id,
+        zoneId: juffairZone.id,
+        role: 'PRIMARY_HEAD',
+        isPrimary: true,
+        isActive: true,
+      },
+    });
+
+    await prisma.employeeZone.upsert({
+      where: {
+        employeeId_zoneId: {
+          employeeId: adminEmpForZone.id,
+          zoneId: seefZone.id,
+        },
+      },
+      update: { role: 'SECONDARY_HEAD' },
+      create: {
+        employeeId: adminEmpForZone.id,
+        zoneId: seefZone.id,
+        role: 'SECONDARY_HEAD',
+        isPrimary: false,
+        isActive: true,
+      },
+    });
+
+    console.log('✅ Assigned admin as zone head for Juffair (PRIMARY) and Seef (SECONDARY)');
+  }
 
   // Create Demo Properties
   const villa = propertyTypes.find(pt => pt.name === 'Villa');
@@ -1103,11 +1169,141 @@ async function main() {
   }
   console.log('✅ Assigned menus to receptionist role');
 
+  // Create Action Templates
+  const actionTemplates = await Promise.all([
+    prisma.actionTemplate.upsert({
+      where: { code: 'REPAIR_COMPLETED' },
+      update: {},
+      create: {
+        code: 'REPAIR_COMPLETED',
+        name: 'Repair Completed',
+        nameAr: 'تم الإصلاح',
+        description: 'Technician identified the issue and successfully repaired the equipment/system. All components are now functioning properly. Tested and verified working condition.',
+        descriptionAr: 'قام الفني بتحديد المشكلة وإصلاح المعدات/النظام بنجاح. جميع المكونات تعمل بشكل صحيح الآن. تم الاختبار والتحقق من حالة العمل.',
+        sortOrder: 1,
+      },
+    }),
+    prisma.actionTemplate.upsert({
+      where: { code: 'PART_REPLACEMENT' },
+      update: {},
+      create: {
+        code: 'PART_REPLACEMENT',
+        name: 'Part Replacement',
+        nameAr: 'استبدال قطعة',
+        description: 'Replaced faulty component(s) with new parts. Old parts removed and disposed. System tested after replacement - operating normally.',
+        descriptionAr: 'تم استبدال المكون(ات) المعيبة بقطع جديدة. تمت إزالة القطع القديمة والتخلص منها. تم اختبار النظام بعد الاستبدال - يعمل بشكل طبيعي.',
+        sortOrder: 2,
+      },
+    }),
+    prisma.actionTemplate.upsert({
+      where: { code: 'CLEANING_SERVICE' },
+      update: {},
+      create: {
+        code: 'CLEANING_SERVICE',
+        name: 'Cleaning & Maintenance',
+        nameAr: 'تنظيف وصيانة',
+        description: 'Performed thorough cleaning and routine maintenance. All filters cleaned/replaced, surfaces cleaned, and system optimized for efficient operation.',
+        descriptionAr: 'تم إجراء تنظيف شامل وصيانة روتينية. تم تنظيف/استبدال جميع الفلاتر، وتنظيف الأسطح، وتحسين النظام للتشغيل الفعال.',
+        sortOrder: 3,
+      },
+    }),
+    prisma.actionTemplate.upsert({
+      where: { code: 'INSPECTION_ONLY' },
+      update: {},
+      create: {
+        code: 'INSPECTION_ONLY',
+        name: 'Inspection Only',
+        nameAr: 'فحص فقط',
+        description: 'Conducted detailed inspection of the equipment/area. Documented current condition and noted any potential issues for future attention.',
+        descriptionAr: 'تم إجراء فحص تفصيلي للمعدات/المنطقة. تم توثيق الحالة الحالية وملاحظة أي مشكلات محتملة للاهتمام المستقبلي.',
+        sortOrder: 4,
+      },
+    }),
+    prisma.actionTemplate.upsert({
+      where: { code: 'INSTALLATION' },
+      update: {},
+      create: {
+        code: 'INSTALLATION',
+        name: 'New Installation',
+        nameAr: 'تركيب جديد',
+        description: 'Successfully installed new equipment/system as requested. Installation completed, tested, and customer briefed on operation and maintenance.',
+        descriptionAr: 'تم تركيب المعدات/النظام الجديد بنجاح كما هو مطلوب. اكتمل التركيب والاختبار وتم إطلاع العميل على التشغيل والصيانة.',
+        sortOrder: 5,
+      },
+    }),
+    prisma.actionTemplate.upsert({
+      where: { code: 'TEMPORARY_FIX' },
+      update: {},
+      create: {
+        code: 'TEMPORARY_FIX',
+        name: 'Temporary Fix',
+        nameAr: 'إصلاح مؤقت',
+        description: 'Applied temporary solution to restore functionality. Permanent repair requires additional parts/time. Follow-up visit scheduled.',
+        descriptionAr: 'تم تطبيق حل مؤقت لاستعادة الوظائف. يتطلب الإصلاح الدائم قطعًا/وقتًا إضافيًا. تم جدولة زيارة متابعة.',
+        sortOrder: 6,
+      },
+    }),
+    prisma.actionTemplate.upsert({
+      where: { code: 'NO_FAULT_FOUND' },
+      update: {},
+      create: {
+        code: 'NO_FAULT_FOUND',
+        name: 'No Fault Found',
+        nameAr: 'لم يتم العثور على عطل',
+        description: 'Thorough inspection completed. Equipment/system operating within normal parameters. No issues detected at this time.',
+        descriptionAr: 'اكتمل الفحص الشامل. المعدات/النظام يعمل ضمن المعايير الطبيعية. لم يتم اكتشاف أي مشكلات في هذا الوقت.',
+        sortOrder: 7,
+      },
+    }),
+    prisma.actionTemplate.upsert({
+      where: { code: 'CUSTOMER_EDUCATION' },
+      update: {},
+      create: {
+        code: 'CUSTOMER_EDUCATION',
+        name: 'Customer Education',
+        nameAr: 'توعية العميل',
+        description: 'Provided guidance to customer on proper usage and maintenance. Issue was due to user operation - demonstrated correct procedures.',
+        descriptionAr: 'تم تقديم إرشادات للعميل حول الاستخدام والصيانة الصحيحة. كانت المشكلة بسبب تشغيل المستخدم - تم عرض الإجراءات الصحيحة.',
+        sortOrder: 8,
+      },
+    }),
+    prisma.actionTemplate.upsert({
+      where: { code: 'REQUIRES_QUOTE' },
+      update: {},
+      create: {
+        code: 'REQUIRES_QUOTE',
+        name: 'Requires Quotation',
+        nameAr: 'يتطلب عرض سعر',
+        description: 'Assessed the situation and determined scope of work. Customer to be provided with quotation for approval before proceeding with repair.',
+        descriptionAr: 'تم تقييم الوضع وتحديد نطاق العمل. سيتم تزويد العميل بعرض أسعار للموافقة قبل الشروع في الإصلاح.',
+        sortOrder: 9,
+      },
+    }),
+    prisma.actionTemplate.upsert({
+      where: { code: 'WARRANTY_CLAIM' },
+      update: {},
+      create: {
+        code: 'WARRANTY_CLAIM',
+        name: 'Warranty Claim',
+        nameAr: 'مطالبة ضمان',
+        description: 'Issue covered under warranty. Documented for warranty claim processing. No charge to customer for this service.',
+        descriptionAr: 'المشكلة مغطاة بالضمان. تم التوثيق لمعالجة مطالبة الضمان. لا رسوم على العميل لهذه الخدمة.',
+        sortOrder: 10,
+      },
+    }),
+  ]);
+
+  console.log(`✅ Created ${actionTemplates.length} action templates`);
+
   console.log('\n🎉 Database seeding completed successfully!');
   console.log('\n📝 Demo credentials:');
-  console.log('   Email: admin@fixitbh.com');
-  console.log('   Password: Admin123');
-  console.log('   Company: FixIt Pro WLL');
+  console.log('   Tenant Admin:');
+  console.log('     Email: admin@fixitbh.com');
+  console.log('     Password: Admin123');
+  console.log('     Company: FixIt Pro WLL');
+  console.log('\n   Product Admin (system user - not shown in user list):');
+  console.log('     Email: prdadmin@agentcare.com');
+  console.log('     Password: Admin123');
 }
 
 main()

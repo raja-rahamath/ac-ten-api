@@ -14,6 +14,13 @@ const controller = new CompanyController();
 
 router.use(authenticate);
 
+// Get primary company for header display (must be before /:id routes)
+router.get(
+  '/primary',
+  authorize('companies:read'),
+  controller.getPrimary.bind(controller)
+);
+
 router.post(
   '/',
   authorize('companies:write'),
@@ -47,6 +54,14 @@ router.delete(
   authorize('companies:delete'),
   validate(getCompanySchema),
   controller.delete.bind(controller)
+);
+
+// Set a company as primary
+router.post(
+  '/:id/set-primary',
+  authorize('companies:write'),
+  validate(getCompanySchema),
+  controller.setPrimary.bind(controller)
 );
 
 export default router;

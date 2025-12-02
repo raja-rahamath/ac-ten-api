@@ -63,4 +63,36 @@ router.delete(
   controller.delete.bind(controller)
 );
 
+// Attachment routes
+router.post(
+  '/:id/attachments',
+  authorize('service_requests:write'),
+  controller.addAttachment.bind(controller)
+);
+
+router.get(
+  '/:id/attachments',
+  authorize('service_requests:read'),
+  controller.getAttachments.bind(controller)
+);
+
+router.delete(
+  '/:id/attachments/:attachmentId',
+  authorize('service_requests:write'),
+  controller.deleteAttachment.bind(controller)
+);
+
+// Asset linking routes
+router.post(
+  '/:id/asset',
+  authorize('service_requests:write'),
+  controller.linkAsset.bind(controller)
+);
+
+router.delete(
+  '/:id/asset',
+  authorize('service_requests:write'),
+  controller.unlinkAsset.bind(controller)
+);
+
 export default router;

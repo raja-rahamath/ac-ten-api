@@ -12,18 +12,19 @@ datasource db {
 // ==================== USER & AUTH ====================
 
 model User {
-  id          String    @id @default(cuid())
-  email       String    @unique
-  password    String
-  firstName   String    @map("first_name")
-  lastName    String    @map("last_name")
-  phone       String?
-  avatar      String?
-  isActive    Boolean   @default(true) @map("is_active")
-  isVerified  Boolean   @default(false) @map("is_verified")
-  lastLoginAt DateTime? @map("last_login_at")
-  roleId      String?   @map("role_id")
-  role        Role?     @relation(fields: [roleId], references: [id])
+  id           String    @id @default(cuid())
+  email        String    @unique
+  password     String
+  firstName    String    @map("first_name")
+  lastName     String    @map("last_name")
+  phone        String?
+  avatar       String?
+  isActive     Boolean   @default(true) @map("is_active")
+  isVerified   Boolean   @default(false) @map("is_verified")
+  isSystemUser Boolean   @default(false) @map("is_system_user") // Product admin users (not shown in user list)
+  lastLoginAt  DateTime? @map("last_login_at")
+  roleId       String?   @map("role_id")
+  role         Role?     @relation(fields: [roleId], references: [id])
   createdAt   DateTime  @default(now()) @map("audit_create_date")
   createdById String?   @map("audit_create_by")
   updatedAt   DateTime  @updatedAt @map("audit_change_date")
@@ -49,6 +50,9 @@ model User {
   // Receipt Relations
   receiptsCreated Receipt[] @relation("ReceiptCreatedBy")
   receiptsVoided  Receipt[] @relation("ReceiptVoidedBy")
+
+  // Timeline Relations
+  timelineActions RequestTimeline[] @relation("TimelinePerformer")
 
   @@map("users")
   @@schema("fixitbh_ac")
@@ -152,9 +156,12 @@ model Company {
   logo        String?
   email       String?
   phone       String?
+  fax         String?
   website     String?
   address     String?
+  plusCode    String?  @map("plus_code")
   isActive    Boolean  @default(true) @map("is_active")
+  isPrimary   Boolean  @default(false) @map("is_primary")
   createdAt   DateTime @default(now()) @map("audit_create_date")
   createdById String?  @map("audit_create_by")
   updatedAt   DateTime @updatedAt @map("audit_change_date")
@@ -1257,6 +1264,24 @@ model ComplaintType {
   @@schema("fixitbh_ac")
 }
 
+model ActionTemplate {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  name          String
+  nameAr        String?  @map("name_ar")
+  description   String?  @db.Text
+  descriptionAr String?  @map("description_ar") @db.Text
+  sortOrder     Int      @default(0) @map("sort_order")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("audit_create_date")
+  createdById   String?  @map("audit_create_by")
+  updatedAt     DateTime @updatedAt @map("audit_change_date")
+  updatedById   String?  @map("audit_change_by")
+
+  @@map("action_templates")
+  @@schema("fixitbh_ac")
+}
+
 model RequestTimeline {
   id               String         @id @default(cuid())
   serviceRequestId String         @map("service_request_id")
@@ -1264,6 +1289,7 @@ model RequestTimeline {
   action           String
   description      String?
   performedBy      String?        @map("performed_by")
+  performer        User?          @relation("TimelinePerformer", fields: [performedBy], references: [id])
   createdAt        DateTime       @default(now()) @map("audit_create_date")
   createdById      String?        @map("audit_create_by")
 

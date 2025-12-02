@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config/index.js';
 import { UnauthorizedError, ForbiddenError } from '../utils/errors.js';
 import { prisma } from '../config/database.js';
+import { setAuditUser } from './auditMiddleware.js';
 
 interface TokenPayload {
   userId: string;
@@ -36,6 +37,8 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
         role: 'admin',
         permissions: ['*:*'], // Full access for internal services
       };
+      // Set the audit context for system operations
+      setAuditUser(req, 'system');
       return next();
     }
 
@@ -83,6 +86,9 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
       role: user.role?.name || 'user',
       permissions,
     };
+
+    // Set the audit context for this request
+    setAuditUser(req, user.id);
 
     next();
   } catch (error) {

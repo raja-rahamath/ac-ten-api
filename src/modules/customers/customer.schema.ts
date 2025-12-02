@@ -60,6 +60,25 @@ export const listCustomersSchema = z.object({
   }),
 });
 
+export const linkUnitSchema = z.object({
+  params: z.object({
+    id: z.string(),
+  }),
+  body: z.object({
+    unitId: z.string(),
+    ownershipType: z.enum(['OWNER', 'TENANT']).default('TENANT'),
+    isPrimary: z.boolean().default(false),
+  }),
+});
+
+export const unlinkUnitSchema = z.object({
+  params: z.object({
+    id: z.string(),
+    unitId: z.string(),
+  }),
+});
+
 export type CreateCustomerInput = z.infer<typeof createCustomerSchema>['body'];
 export type UpdateCustomerInput = z.infer<typeof updateCustomerSchema>['body'];
 export type ListCustomersQuery = z.infer<typeof listCustomersSchema>['query'];
+export type LinkUnitInput = z.infer<typeof linkUnitSchema>['body'];

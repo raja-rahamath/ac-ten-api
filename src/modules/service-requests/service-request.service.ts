@@ -7,12 +7,33 @@ import {
   ListServiceRequestsQuery,
 } from './service-request.schema.js';
 
-function generateRequestNo(): string {
-  const date = new Date();
-  const year = date.getFullYear().toString().slice(-2);
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
-  return `SR${year}${month}-${random}`;
+async function generateRequestNo(): Promise<string> {
+  // Get the highest existing request number
+  const lastRequest = await prisma.serviceRequest.findFirst({
+    where: {
+      requestNo: {
+        startsWith: 'SR-',
+      },
+    },
+    orderBy: {
+      requestNo: 'desc',
+    },
+    select: {
+      requestNo: true,
+    },
+  });
+
+  let nextNumber = 1;
+  if (lastRequest?.requestNo) {
+    // Extract the number part from SR-00001 format
+    const match = lastRequest.requestNo.match(/SR-(\d+)/);
+    if (match) {
+      nextNumber = parseInt(match[1], 10) + 1;
+    }
+  }
+
+  // Format as SR-00001 (5 digits, padded with zeros)
+  return `SR-${nextNumber.toString().padStart(5, '0')}`;
 }
 
 export class ServiceRequestService {
@@ -25,17 +46,46 @@ export class ServiceRequestService {
       throw new NotFoundError('Customer not found');
     }
 
-    // Validate property exists
-    const property = await prisma.property.findUnique({
+    // Validate property exists - check Unit first, then legacy Property
+    let zoneId = input.zoneId;
+    let unitId: string | null = null;
+    let propertyId: string | null = null;
+
+    const unit = await prisma.unit.findUnique({
       where: { id: input.propertyId },
+      include: {
+        building: {
+          select: { zoneId: true },
+        },
+      },
     });
-    if (!property) {
-      throw new NotFoundError('Property not found');
+
+    if (unit) {
+      // It's a Unit - store in unitId field
+      unitId = unit.id;
+      // Derive zoneId from unit's building if not provided
+      if (!zoneId && unit.building?.zoneId) {
+        zoneId = unit.building.zoneId;
+      }
+    } else {
+      // Fall back to legacy Property model
+      const property = await prisma.property.findUnique({
+        where: { id: input.propertyId },
+      });
+      if (!property) {
+        throw new NotFoundError('Property not found');
+      }
+      // It's a Property - store in propertyId field
+      propertyId = property.id;
     }
 
-    // Validate zone exists
+    // Validate zone exists - zoneId is required
+    if (!zoneId) {
+      throw new BadRequestError('Zone is required. Please select a property with a valid zone.');
+    }
+
     const zone = await prisma.zone.findUnique({
-      where: { id: input.zoneId },
+      where: { id: zoneId },
     });
     if (!zone) {
       throw new NotFoundError('Zone not found');
@@ -49,29 +99,60 @@ export class ServiceRequestService {
       throw new NotFoundError('Complaint type not found');
     }
 
+    // Find zone head for auto-assignment
+    const zoneHead = await prisma.employeeZone.findFirst({
+      where: {
+        zoneId: zoneId,
+        role: { in: ['PRIMARY_HEAD', 'SECONDARY_HEAD'] },
+        isActive: true,
+        employee: {
+          isActive: true,
+        },
+      },
+      orderBy: [
+        // Prefer PRIMARY_HEAD over SECONDARY_HEAD
+        { role: 'asc' },
+      ],
+      include: {
+        employee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    const requestNo = await generateRequestNo();
+
     const serviceRequest = await prisma.serviceRequest.create({
       data: {
-        requestNo: generateRequestNo(),
+        requestNo,
         customerId: input.customerId,
-        propertyId: input.propertyId,
+        propertyId: propertyId,
+        unitId: unitId,
         assetId: input.assetId,
-        zoneId: input.zoneId,
+        zoneId: zoneId,
         complaintTypeId: input.complaintTypeId,
         requestType: input.requestType as any,
         priority: input.priority as any,
         title: input.title,
         description: input.description,
-        status: 'NEW',
+        status: zoneHead ? 'ASSIGNED' : 'NEW',
+        assignedToId: zoneHead?.employee.id,
       },
       include: {
         customer: true,
         property: true,
+        unit: true,
         zone: true,
         complaintType: true,
+        assignedTo: true,
       },
     });
 
-    // Create timeline entry
+    // Create timeline entry for request creation
     await prisma.requestTimeline.create({
       data: {
         serviceRequestId: serviceRequest.id,
@@ -79,6 +160,17 @@ export class ServiceRequestService {
         description: 'Service request created',
       },
     });
+
+    // Create timeline entry for auto-assignment if zone head found
+    if (zoneHead) {
+      await prisma.requestTimeline.create({
+        data: {
+          serviceRequestId: serviceRequest.id,
+          action: 'AUTO_ASSIGNED',
+          description: `Auto-assigned to zone head: ${zoneHead.employee.firstName} ${zoneHead.employee.lastName}`,
+        },
+      });
+    }
 
     return serviceRequest;
   }
@@ -89,12 +181,26 @@ export class ServiceRequestService {
       include: {
         customer: true,
         property: true,
+        unit: {
+          include: {
+            building: true,
+          },
+        },
         asset: true,
         zone: true,
         complaintType: true,
         assignedTo: true,
         timeline: {
           orderBy: { createdAt: 'desc' },
+          include: {
+            performer: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
         },
         attachments: true,
         quotations: true,
@@ -145,7 +251,17 @@ export class ServiceRequestService {
         where,
         skip,
         take: limit,
-        include: {
+        select: {
+          id: true,
+          requestNo: true,
+          title: true,
+          description: true,
+          status: true,
+          priority: true,
+          source: true,
+          createdAt: true,
+          startedAt: true,
+          completedAt: true,
           customer: {
             select: {
               id: true,
@@ -161,12 +277,31 @@ export class ServiceRequestService {
               name: true,
             },
           },
+          unit: {
+            select: {
+              id: true,
+              unitNo: true,
+              flatNumber: true,
+              building: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
           complaintType: true,
           assignedTo: {
             select: {
               id: true,
               firstName: true,
               lastName: true,
+            },
+          },
+          zone: {
+            select: {
+              id: true,
+              name: true,
             },
           },
         },
@@ -208,6 +343,7 @@ export class ServiceRequestService {
       include: {
         customer: true,
         property: true,
+        unit: true,
         complaintType: true,
         assignedTo: true,
       },
@@ -316,5 +452,165 @@ export class ServiceRequestService {
         return acc;
       }, {} as Record<string, number>),
     };
+  }
+
+  // Add attachment to service request
+  async addAttachment(
+    serviceRequestId: string,
+    attachment: {
+      fileName: string;
+      fileType: string;
+      fileSize: number;
+      filePath: string;
+    },
+    userId?: string
+  ) {
+    const existing = await prisma.serviceRequest.findUnique({
+      where: { id: serviceRequestId },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('Service request not found');
+    }
+
+    const newAttachment = await prisma.requestAttachment.create({
+      data: {
+        serviceRequestId,
+        fileName: attachment.fileName,
+        fileType: attachment.fileType,
+        fileSize: attachment.fileSize,
+        filePath: attachment.filePath,
+        uploadedBy: userId,
+      },
+    });
+
+    // Create timeline entry
+    await prisma.requestTimeline.create({
+      data: {
+        serviceRequestId,
+        action: 'ATTACHMENT_ADDED',
+        description: `File uploaded: ${attachment.fileName}`,
+        performedBy: userId,
+      },
+    });
+
+    return newAttachment;
+  }
+
+  // Get attachments for a service request
+  async getAttachments(serviceRequestId: string) {
+    const existing = await prisma.serviceRequest.findUnique({
+      where: { id: serviceRequestId },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('Service request not found');
+    }
+
+    return prisma.requestAttachment.findMany({
+      where: { serviceRequestId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  // Delete attachment
+  async deleteAttachment(serviceRequestId: string, attachmentId: string, userId?: string) {
+    const attachment = await prisma.requestAttachment.findFirst({
+      where: { id: attachmentId, serviceRequestId },
+    });
+
+    if (!attachment) {
+      throw new NotFoundError('Attachment not found');
+    }
+
+    await prisma.requestAttachment.delete({
+      where: { id: attachmentId },
+    });
+
+    // Create timeline entry
+    await prisma.requestTimeline.create({
+      data: {
+        serviceRequestId,
+        action: 'ATTACHMENT_REMOVED',
+        description: `File removed: ${attachment.fileName}`,
+        performedBy: userId,
+      },
+    });
+
+    return { message: 'Attachment deleted successfully' };
+  }
+
+  // Link asset to service request
+  async linkAsset(serviceRequestId: string, assetId: string, userId?: string) {
+    const existing = await prisma.serviceRequest.findUnique({
+      where: { id: serviceRequestId },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('Service request not found');
+    }
+
+    const asset = await prisma.asset.findUnique({
+      where: { id: assetId },
+    });
+
+    if (!asset) {
+      throw new NotFoundError('Asset not found');
+    }
+
+    const serviceRequest = await prisma.serviceRequest.update({
+      where: { id: serviceRequestId },
+      data: { assetId },
+      include: {
+        asset: {
+          include: {
+            type: true,
+          },
+        },
+      },
+    });
+
+    // Create timeline entry
+    await prisma.requestTimeline.create({
+      data: {
+        serviceRequestId,
+        action: 'ASSET_LINKED',
+        description: `Asset linked: ${asset.name || asset.assetNo}`,
+        performedBy: userId,
+      },
+    });
+
+    return serviceRequest;
+  }
+
+  // Unlink asset from service request
+  async unlinkAsset(serviceRequestId: string, userId?: string) {
+    const existing = await prisma.serviceRequest.findUnique({
+      where: { id: serviceRequestId },
+      include: { asset: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('Service request not found');
+    }
+
+    const assetName = existing.asset?.name || existing.asset?.assetNo || 'Unknown';
+
+    const serviceRequest = await prisma.serviceRequest.update({
+      where: { id: serviceRequestId },
+      data: { assetId: null },
+    });
+
+    // Create timeline entry
+    await prisma.requestTimeline.create({
+      data: {
+        serviceRequestId,
+        action: 'ASSET_UNLINKED',
+        description: `Asset unlinked: ${assetName}`,
+        performedBy: userId,
+      },
+    });
+
+    return serviceRequest;
   }
 }

@@ -12,6 +12,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { notFoundHandler } from './middleware/notFoundHandler.js';
 import { apiLimiter, authLimiter } from './middleware/rateLimiter.js';
 import { sanitize } from './middleware/sanitize.js';
+import { auditMiddleware } from './middleware/auditMiddleware.js';
 
 // Import routes
 import authRoutes from './modules/auth/auth.routes.js';
@@ -53,6 +54,7 @@ import quoteRoutes from './modules/quotes/quote.routes.js';
 import receiptRoutes from './modules/receipts/receipt.routes.js';
 import collectionRoutes from './modules/collections/collection.routes.js';
 import reportRoutes from './modules/reports/report.routes.js';
+import actionTemplateRoutes from './modules/action-templates/action-template.routes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -104,6 +106,9 @@ export function createApp(): Express {
 
   // Request logging
   app.use(pinoHttp({ logger }));
+
+  // Audit context middleware - initializes audit context for tracking user who creates/updates records
+  app.use(auditMiddleware);
 
   // Health check (no auth required)
   app.use('/health', healthRoutes);
@@ -161,6 +166,7 @@ export function createApp(): Express {
   apiRouter.use('/receipts', receiptRoutes);
   apiRouter.use('/collections', collectionRoutes);
   apiRouter.use('/reports', reportRoutes);
+  apiRouter.use('/action-templates', actionTemplateRoutes);
 
   app.use(`/api/${config.apiVersion}`, apiRouter);
 

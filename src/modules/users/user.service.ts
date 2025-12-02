@@ -80,7 +80,10 @@ export class UserService {
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: any = {
+      // Exclude system users (product admin) from the user list
+      isSystemUser: false,
+    };
 
     if (search) {
       where.OR = [

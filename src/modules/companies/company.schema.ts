@@ -7,8 +7,11 @@ export const createCompanySchema = z.object({
     logo: z.string().optional(),
     email: z.string().email().optional(),
     phone: z.string().optional(),
+    fax: z.string().optional(),
     website: z.string().url().optional(),
     address: z.string().optional(),
+    plusCode: z.string().optional(),
+    isPrimary: z.boolean().optional(),
   }),
 });
 
@@ -22,9 +25,12 @@ export const updateCompanySchema = z.object({
     logo: z.string().optional(),
     email: z.string().email().optional(),
     phone: z.string().optional(),
+    fax: z.string().optional(),
     website: z.string().url().optional(),
     address: z.string().optional(),
+    plusCode: z.string().optional(),
     isActive: z.boolean().optional(),
+    isPrimary: z.boolean().optional(),
   }),
 });
 

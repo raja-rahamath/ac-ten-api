@@ -13,6 +13,14 @@ export class CompanyService {
       throw new ConflictError('Company with this name already exists');
     }
 
+    // If setting as primary, unset any existing primary company
+    if (input.isPrimary) {
+      await prisma.company.updateMany({
+        where: { isPrimary: true },
+        data: { isPrimary: false },
+      });
+    }
+
     const company = await prisma.company.create({
       data: input,
       include: {
@@ -110,6 +118,17 @@ export class CompanyService {
       }
     }
 
+    // If setting as primary, unset any existing primary company
+    if (input.isPrimary === true) {
+      await prisma.company.updateMany({
+        where: {
+          isPrimary: true,
+          NOT: { id },
+        },
+        data: { isPrimary: false },
+      });
+    }
+
     const company = await prisma.company.update({
       where: { id },
       data: input,
@@ -137,5 +156,61 @@ export class CompanyService {
     });
 
     return { message: 'Company deleted successfully' };
+  }
+
+  /**
+   * Get the primary company for display in header
+   * Returns primary company if set, otherwise falls back to first active company by name
+   */
+  async getPrimary() {
+    // First try to find the primary company
+    let company = await prisma.company.findFirst({
+      where: {
+        isPrimary: true,
+        isActive: true,
+      },
+    });
+
+    // If no primary company, fallback to first active company by name ascending
+    if (!company) {
+      company = await prisma.company.findFirst({
+        where: { isActive: true },
+        orderBy: { name: 'asc' },
+      });
+    }
+
+    return company;
+  }
+
+  /**
+   * Set a company as primary (only one can be primary at a time)
+   */
+  async setPrimary(id: string) {
+    const existing = await prisma.company.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('Company not found');
+    }
+
+    // Unset any existing primary company and set the new one
+    await prisma.$transaction([
+      prisma.company.updateMany({
+        where: { isPrimary: true },
+        data: { isPrimary: false },
+      }),
+      prisma.company.update({
+        where: { id },
+        data: { isPrimary: true },
+      }),
+    ]);
+
+    return prisma.company.findUnique({
+      where: { id },
+      include: {
+        divisions: true,
+      },
+    });
   }
 }

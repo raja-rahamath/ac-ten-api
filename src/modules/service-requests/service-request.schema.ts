@@ -5,7 +5,7 @@ export const createServiceRequestSchema = z.object({
     customerId: z.string(),
     propertyId: z.string(),
     assetId: z.string().optional(),
-    zoneId: z.string(),
+    zoneId: z.string().optional(), // Will be derived from property if not provided
     complaintTypeId: z.string(),
     requestType: z.enum(['ON_CALL', 'CONTRACT', 'WARRANTY', 'EMERGENCY']).default('ON_CALL'),
     priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'),

@@ -7,6 +7,8 @@ import {
   updateCustomerSchema,
   getCustomerSchema,
   listCustomersSchema,
+  linkUnitSchema,
+  unlinkUnitSchema,
 } from './customer.schema.js';
 
 const router = Router();
@@ -48,6 +50,21 @@ router.delete(
   authorize('customers:delete'),
   validate(getCustomerSchema),
   controller.delete.bind(controller)
+);
+
+// Link/unlink units (properties) to customer
+router.post(
+  '/:id/units',
+  authorize('customers:write'),
+  validate(linkUnitSchema),
+  controller.linkUnit.bind(controller)
+);
+
+router.delete(
+  '/:id/units/:unitId',
+  authorize('customers:write'),
+  validate(unlinkUnitSchema),
+  controller.unlinkUnit.bind(controller)
 );
 
 export default router;
