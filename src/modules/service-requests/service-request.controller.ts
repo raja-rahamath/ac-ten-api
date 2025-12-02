@@ -109,9 +109,27 @@ export class ServiceRequestController {
   // Attachment methods
   async addAttachment(req: Request, res: Response, next: NextFunction) {
     try {
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'No file uploaded' },
+        });
+      }
+
+      // Build file path relative to uploads directory
+      const relativePath = `/uploads/service-requests/${req.params.id}/${file.filename}`;
+
+      const attachmentData = {
+        fileName: file.originalname,
+        fileType: file.mimetype,
+        fileSize: file.size,
+        filePath: relativePath,
+      };
+
       const attachment = await serviceRequestService.addAttachment(
         req.params.id,
-        req.body,
+        attachmentData,
         req.user?.id
       );
       res.status(201).json({

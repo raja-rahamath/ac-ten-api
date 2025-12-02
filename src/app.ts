@@ -2,6 +2,7 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
+import path from 'path';
 import { pinoHttp } from 'pino-http';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger.js';
@@ -61,6 +62,7 @@ import workOrderRoutes from './modules/work-orders/work-order.routes.js';
 import notificationRoutes from './modules/notifications/notification.routes.js';
 import membershipRoutes from './modules/memberships/membership.routes.js';
 import reviewRoutes from './modules/reviews/review.routes.js';
+import commentRoutes from './modules/comments/comment.routes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -115,6 +117,9 @@ export function createApp(): Express {
 
   // Audit context middleware - initializes audit context for tracking user who creates/updates records
   app.use(auditMiddleware);
+
+  // Serve uploaded files (no auth required for file access)
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   // Health check (no auth required)
   app.use('/health', healthRoutes);
@@ -179,6 +184,7 @@ export function createApp(): Express {
   apiRouter.use('/notifications', notificationRoutes);
   apiRouter.use('/memberships', membershipRoutes);
   apiRouter.use('/reviews', reviewRoutes);
+  apiRouter.use('/comments', commentRoutes);
 
   app.use(`/api/${config.apiVersion}`, apiRouter);
 

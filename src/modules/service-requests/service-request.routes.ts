@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { ServiceRequestController } from './service-request.controller.js';
 import { authenticate, authorize } from '../../middleware/authenticate.js';
 import { validate } from '../../middleware/validate.js';
+import { uploadAttachment } from '../../middleware/upload.js';
 import {
   createServiceRequestSchema,
   updateServiceRequestSchema,
@@ -63,10 +64,11 @@ router.delete(
   controller.delete.bind(controller)
 );
 
-// Attachment routes
+// Attachment routes (with file upload)
 router.post(
   '/:id/attachments',
   authorize('service_requests:write'),
+  uploadAttachment,
   controller.addAttachment.bind(controller)
 );
 

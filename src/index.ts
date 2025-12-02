@@ -2,6 +2,7 @@ import { createApp } from './app.js';
 import { config } from './config/index.js';
 import { logger } from './config/logger.js';
 import { prisma } from './config/database.js';
+import { schedulerService } from './services/scheduler.service.js';
 
 async function main() {
   try {
@@ -15,11 +16,15 @@ async function main() {
     app.listen(config.port, () => {
       logger.info(`Server running on port ${config.port} in ${config.nodeEnv} mode`);
       logger.info(`API available at http://localhost:${config.port}/api/${config.apiVersion}`);
+
+      // Initialize scheduler after server starts
+      schedulerService.initialize();
     });
 
     // Graceful shutdown
     const shutdown = async (signal: string) => {
       logger.info(`${signal} received, shutting down gracefully...`);
+      schedulerService.stopAll();
       await prisma.$disconnect();
       process.exit(0);
     };

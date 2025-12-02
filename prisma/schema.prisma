@@ -52,7 +52,8 @@ model User {
   receiptsVoided  Receipt[] @relation("ReceiptVoidedBy")
 
   // Timeline Relations
-  timelineActions RequestTimeline[] @relation("TimelinePerformer")
+  timelineActions RequestTimeline[]       @relation("TimelinePerformer")
+  commentsCreated ServiceRequestComment[] @relation("CommentCreator")
 
   // Estimate Relations
   estimatesCreated   Estimate[]         @relation("EstimateCreatedBy")
@@ -1228,6 +1229,7 @@ model ServiceRequest {
   estimates  Estimate[]
   workOrders WorkOrder[]
   reviews    CustomerReview[]
+  comments   ServiceRequestComment[]
 
   @@map("service_requests")
   @@schema("fixitbh_ac")
@@ -1335,6 +1337,58 @@ model RequestTimeline {
   createdById      String?        @map("audit_create_by")
 
   @@map("request_timeline")
+  @@schema("fixitbh_ac")
+}
+
+model ServiceRequestComment {
+  id               String         @id @default(cuid())
+  serviceRequestId String         @map("service_request_id")
+  serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+
+  // Comment content
+  content     String
+  commentType CommentType @default(INTERNAL_NOTE) @map("comment_type")
+
+  // Visibility
+  isInternal       Boolean @default(true) @map("is_internal") // Internal notes vs customer visible
+  isCustomerAuthor Boolean @default(false) @map("is_customer_author") // Was this written by customer?
+
+  // Contact tracking (for phone/email interactions)
+  contactMethod   String?   @map("contact_method") // "PHONE", "EMAIL", "IN_PERSON", "WHATSAPP"
+  contactNumber   String?   @map("contact_number") // Phone number or email used
+  contactDuration Int?      @map("contact_duration") // Duration in seconds for calls
+  contactedAt     DateTime? @map("contacted_at") // When the contact happened
+
+  // Scheduling preference from this conversation
+  preferredDate String? @map("preferred_date") // e.g., "2024-12-03"
+  preferredTime String? @map("preferred_time") // e.g., "10:30 AM" or "16:00"
+
+  // Metadata
+  createdAt   DateTime @default(now()) @map("audit_create_date")
+  createdById String?  @map("audit_create_by")
+  createdBy   User?    @relation("CommentCreator", fields: [createdById], references: [id])
+  updatedAt   DateTime @updatedAt @map("audit_change_date")
+  updatedById String?  @map("audit_change_by")
+
+  @@index([serviceRequestId])
+  @@index([commentType])
+  @@map("service_request_comments")
+  @@schema("fixitbh_ac")
+}
+
+enum CommentType {
+  INTERNAL_NOTE // Internal staff note
+  CUSTOMER_CALL // Outbound call to customer
+  CUSTOMER_CALLED // Inbound call from customer
+  EMAIL_SENT // Email sent to customer
+  EMAIL_RECEIVED // Email from customer
+  SMS_SENT // SMS sent to customer
+  SMS_RECEIVED // SMS from customer
+  WHATSAPP // WhatsApp message
+  CUSTOMER_MESSAGE // Message from customer portal
+  SITE_VISIT_NOTE // Note from site visit
+  SCHEDULING_NOTE // Note about scheduling preference
+
   @@schema("fixitbh_ac")
 }
 
