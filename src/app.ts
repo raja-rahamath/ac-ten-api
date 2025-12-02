@@ -59,6 +59,7 @@ import estimateRoutes from './modules/estimates/estimate.routes.js';
 import siteVisitRoutes from './modules/site-visits/site-visit.routes.js';
 import workOrderRoutes from './modules/work-orders/work-order.routes.js';
 import notificationRoutes from './modules/notifications/notification.routes.js';
+import membershipRoutes from './modules/memberships/membership.routes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -175,6 +176,7 @@ export function createApp(): Express {
   apiRouter.use('/site-visits', siteVisitRoutes);
   apiRouter.use('/work-orders', workOrderRoutes);
   apiRouter.use('/notifications', notificationRoutes);
+  apiRouter.use('/memberships', membershipRoutes);
 
   app.use(`/api/${config.apiVersion}`, apiRouter);
 
