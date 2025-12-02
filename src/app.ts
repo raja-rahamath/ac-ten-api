@@ -8,6 +8,7 @@ import { config } from './config/index.js';
 import { logger } from './config/logger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { notFoundHandler } from './middleware/notFoundHandler.js';
+import { apiLimiter, authLimiter } from './middleware/rateLimiter.js';
 
 // Import routes
 import authRoutes from './modules/auth/auth.routes.js';
@@ -53,14 +54,40 @@ import reportRoutes from './modules/reports/report.routes.js';
 export function createApp(): Express {
   const app = express();
 
-  // Security middleware
-  app.use(helmet());
+  // Security middleware with enhanced options
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:"],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false, // Required for some frontend frameworks
+    hsts: {
+      maxAge: 31536000, // 1 year
+      includeSubDomains: true,
+      preload: true,
+    },
+  }));
 
   // CORS
   app.use(cors({
     origin: config.corsOrigins,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Tenant-ID'],
+    exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
   }));
+
+  // Apply general rate limiting to all API routes
+  app.use('/api', apiLimiter);
 
   // Compression
   app.use(compression());
