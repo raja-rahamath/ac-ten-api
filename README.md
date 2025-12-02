@@ -1,4 +1,4 @@
-# AgentCare API
+# AgentCare Tenant API
 
 Backend API for AgentCare - AI-Powered Maintenance Service Management Platform
 
@@ -12,6 +12,7 @@ Backend API for AgentCare - AI-Powered Maintenance Service Management Platform
 - **Cache/Queue:** Redis + Bull
 - **Validation:** Zod
 - **Auth:** JWT
+- **API Docs:** Swagger/OpenAPI
 
 ## Getting Started
 
@@ -21,30 +22,58 @@ Backend API for AgentCare - AI-Powered Maintenance Service Management Platform
 - PostgreSQL 15+
 - Redis 7+
 - pnpm (recommended) or npm
+- Docker (optional, for database)
 
-### Installation
+### Quick Start with Docker
 
 ```bash
+# Start PostgreSQL and Redis containers
+docker compose up -d
+
 # Install dependencies
 pnpm install
 
-# Copy environment file
+# Setup database and start server
+pnpm db:generate && pnpm db:push && pnpm db:seed && pnpm dev
+```
+
+### Manual Installation
+
+```bash
+# 1. Install dependencies
+pnpm install
+
+# 2. Copy environment file
 cp .env.example .env
 
-# Update .env with your database credentials
+# 3. Configure .env (see Environment Variables section below)
 
-# Generate Prisma client
+# 4. Generate Prisma client
 pnpm db:generate
 
-# Run migrations
-pnpm db:migrate
+# 5. Run database migrations
+pnpm db:push
 
-# Seed database (optional)
+# 6. Seed database with sample data
 pnpm db:seed
 
-# Start development server
+# 7. Start development server
 pnpm dev
 ```
+
+### Environment Variables
+
+Copy `.env.example` to `.env` and configure:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/agentcare` |
+| `REDIS_URL` | Redis connection string | `redis://localhost:6379` |
+| `JWT_SECRET` | Secret for signing tokens (min 32 chars) | Generate with `openssl rand -base64 32` |
+| `INTERNAL_API_KEY` | API key for service-to-service auth | Generate with `openssl rand -hex 32` |
+| `CORS_ORIGINS` | Allowed origins (comma-separated) | `http://localhost:3000,http://localhost:3002` |
+
+**Important:** Never commit `.env` to git. Only `.env.example` should be tracked.
 
 ### Available Scripts
 
@@ -60,19 +89,27 @@ pnpm dev
 | `pnpm db:migrate` | Run database migrations |
 | `pnpm db:studio` | Open Prisma Studio |
 
-## API Endpoints
+## API Documentation
 
-### Health
-- `GET /health` - Health check
-- `GET /health/ready` - Readiness check (includes DB)
+Interactive API documentation is available at:
+- **Swagger UI:** http://localhost:4001/api-docs
+- **OpenAPI JSON:** http://localhost:4001/api-docs.json
 
-### Authentication
-- `POST /api/v1/auth/login` - User login
-- `POST /api/v1/auth/register` - User registration
-- `POST /api/v1/auth/refresh` - Refresh access token
-- `POST /api/v1/auth/logout` - User logout
+### Key Endpoints
 
-### More endpoints coming soon...
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/api/v1/auth/login` | POST | User login |
+| `/api/v1/auth/register` | POST | User registration |
+| `/api/v1/auth/me` | GET | Current user profile |
+| `/api/v1/customers` | GET/POST | Customer management |
+| `/api/v1/employees` | GET/POST | Employee management |
+| `/api/v1/service-requests` | GET/POST | Service request management |
+| `/api/v1/invoices` | GET/POST | Invoice management |
+| `/api/v1/properties` | GET/POST | Property management |
+
+See Swagger UI for complete endpoint documentation with request/response schemas.
 
 ## Project Structure
 
