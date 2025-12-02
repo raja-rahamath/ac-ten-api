@@ -55,6 +55,8 @@ import receiptRoutes from './modules/receipts/receipt.routes.js';
 import collectionRoutes from './modules/collections/collection.routes.js';
 import reportRoutes from './modules/reports/report.routes.js';
 import actionTemplateRoutes from './modules/action-templates/action-template.routes.js';
+import estimateRoutes from './modules/estimates/estimate.routes.js';
+import siteVisitRoutes from './modules/site-visits/site-visit.routes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -167,6 +169,8 @@ export function createApp(): Express {
   apiRouter.use('/collections', collectionRoutes);
   apiRouter.use('/reports', reportRoutes);
   apiRouter.use('/action-templates', actionTemplateRoutes);
+  apiRouter.use('/estimates', estimateRoutes);
+  apiRouter.use('/site-visits', siteVisitRoutes);
 
   app.use(`/api/${config.apiVersion}`, apiRouter);
 

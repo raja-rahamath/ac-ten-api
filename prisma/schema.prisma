@@ -25,10 +25,10 @@ model User {
   lastLoginAt  DateTime? @map("last_login_at")
   roleId       String?   @map("role_id")
   role         Role?     @relation(fields: [roleId], references: [id])
-  createdAt   DateTime  @default(now()) @map("audit_create_date")
-  createdById String?   @map("audit_create_by")
-  updatedAt   DateTime  @updatedAt @map("audit_change_date")
-  updatedById String?   @map("audit_change_by")
+  createdAt    DateTime  @default(now()) @map("audit_create_date")
+  createdById  String?   @map("audit_create_by")
+  updatedAt    DateTime  @updatedAt @map("audit_change_date")
+  updatedById  String?   @map("audit_change_by")
 
   // Relations
   employee  Employee?
@@ -53,6 +53,13 @@ model User {
 
   // Timeline Relations
   timelineActions RequestTimeline[] @relation("TimelinePerformer")
+
+  // Estimate Relations
+  estimatesCreated   Estimate[]         @relation("EstimateCreatedBy")
+  estimatesSubmitted Estimate[]         @relation("EstimateSubmittedBy")
+  estimatesApproved  Estimate[]         @relation("EstimateApprovedBy")
+  estimatesRejected  Estimate[]         @relation("EstimateRejectedBy")
+  estimateActivities EstimateActivity[] @relation("EstimateActivityBy")
 
   @@map("users")
   @@schema("fixitbh_ac")
@@ -286,6 +293,9 @@ model Employee {
   leaveRequests       LeaveRequest[]   @relation("LeaveRequests")
   leaveApprovals      LeaveRequest[]   @relation("LeaveApprover")
   leaveCoverages      LeaveRequest[]   @relation("LeaveCoverage")
+
+  // Site Visit Relations
+  siteVisits SiteVisit[] @relation("SiteVisitAssignee")
 
   @@map("employees")
   @@schema("fixitbh_ac")
@@ -1196,6 +1206,10 @@ model ServiceRequest {
   invoice       Invoice?
   amcSchedule   AmcServiceSchedule?
 
+  // New workflow relations
+  siteVisits SiteVisit[]
+  estimates  Estimate[]
+
   @@map("service_requests")
   @@schema("fixitbh_ac")
 }
@@ -1221,6 +1235,14 @@ enum Priority {
 enum RequestStatus {
   NEW
   ASSIGNED
+  SITE_VISIT_SCHEDULED
+  SITE_VISIT_COMPLETED
+  ESTIMATION_IN_PROGRESS
+  ESTIMATE_PENDING_APPROVAL
+  ESTIMATE_APPROVED
+  QUOTATION_IN_PROGRESS
+  QUOTE_SENT
+  QUOTE_APPROVED
   SCHEDULED
   IN_PROGRESS
   ON_HOLD
@@ -1310,6 +1332,284 @@ model RequestAttachment {
   createdById      String?        @map("audit_create_by")
 
   @@map("request_attachments")
+  @@schema("fixitbh_ac")
+}
+
+// ==================== SITE VISIT ====================
+
+model SiteVisit {
+  id               String         @id @default(cuid())
+  visitNo          String         @unique @map("visit_no") // e.g., SV-2025-0001
+  serviceRequestId String         @map("service_request_id")
+  serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id])
+
+  // Scheduling
+  scheduledDate DateTime  @map("scheduled_date")
+  scheduledTime String?   @map("scheduled_time") // e.g., "09:00-12:00"
+  actualDate    DateTime? @map("actual_date")
+
+  // Assignment
+  assignedToId String?   @map("assigned_to_id")
+  assignedTo   Employee? @relation("SiteVisitAssignee", fields: [assignedToId], references: [id])
+
+  // Status
+  status SiteVisitStatus @default(SCHEDULED)
+
+  // Visit outcome
+  findings          String? @db.Text
+  recommendations   String? @db.Text
+  photos            Json? // Array of photo URLs
+  customerPresent   Boolean @default(true) @map("customer_present")
+  customerSignature String? @map("customer_signature") // Base64 or URL
+
+  // Duration tracking
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+
+  // Audit
+  createdById String?  @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("audit_create_date")
+  updatedAt   DateTime @updatedAt @map("audit_change_date")
+  updatedById String?  @map("audit_change_by")
+
+  // Relations
+  estimates Estimate[]
+
+  @@map("site_visits")
+  @@schema("fixitbh_ac")
+}
+
+enum SiteVisitStatus {
+  SCHEDULED // Visit scheduled
+  CONFIRMED // Customer confirmed
+  IN_PROGRESS // Visit started
+  COMPLETED // Visit completed
+  CANCELLED // Visit cancelled
+  NO_ACCESS // Customer not available / no access
+  RESCHEDULED // Moved to different date
+
+  @@schema("fixitbh_ac")
+}
+
+// ==================== ESTIMATE (Internal Detailed Costing) ====================
+
+model Estimate {
+  id         String @id @default(cuid())
+  estimateNo String @unique @map("estimate_no") // e.g., EST-2025-0001
+
+  // Links
+  serviceRequestId String         @map("service_request_id")
+  serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id])
+  siteVisitId      String?        @map("site_visit_id")
+  siteVisit        SiteVisit?     @relation(fields: [siteVisitId], references: [id])
+
+  // Versioning (for revisions)
+  version          Int        @default(1)
+  parentEstimateId String?    @map("parent_estimate_id")
+  parentEstimate   Estimate?  @relation("EstimateVersions", fields: [parentEstimateId], references: [id])
+  revisions        Estimate[] @relation("EstimateVersions")
+  isLatestVersion  Boolean    @default(true) @map("is_latest_version")
+
+  // Estimate Details
+  title       String
+  description String?        @db.Text
+  scope       String?        @db.Text // Scope of work
+  status      EstimateStatus @default(DRAFT)
+
+  // Cost Breakdown
+  materialCost  Decimal @default(0) @map("material_cost") @db.Decimal(10, 3)
+  laborCost     Decimal @default(0) @map("labor_cost") @db.Decimal(10, 3)
+  equipmentCost Decimal @default(0) @map("equipment_cost") @db.Decimal(10, 3)
+  otherCost     Decimal @default(0) @map("other_cost") @db.Decimal(10, 3)
+  subtotal      Decimal @default(0) @db.Decimal(10, 3)
+
+  // Profit & Tax
+  profitMarginType  DiscountType? @map("profit_margin_type") // PERCENTAGE or FIXED
+  profitMarginValue Decimal       @default(0) @map("profit_margin_value") @db.Decimal(10, 3)
+  profitAmount      Decimal       @default(0) @map("profit_amount") @db.Decimal(10, 3)
+
+  // VAT/Tax
+  vatRate   Decimal @default(10) @map("vat_rate") @db.Decimal(5, 2) // e.g., 10.00 for 10%
+  vatAmount Decimal @default(0) @map("vat_amount") @db.Decimal(10, 3)
+
+  // Discount (if any)
+  discountType   DiscountType? @map("discount_type")
+  discountValue  Decimal       @default(0) @map("discount_value") @db.Decimal(10, 3)
+  discountAmount Decimal       @default(0) @map("discount_amount") @db.Decimal(10, 3)
+  discountReason String?       @map("discount_reason")
+
+  // Totals
+  totalBeforeVat Decimal @default(0) @map("total_before_vat") @db.Decimal(10, 3)
+  total          Decimal @default(0) @db.Decimal(10, 3)
+  currency       String  @default("BHD")
+
+  // Timeline
+  estimatedDuration  Int?      @map("estimated_duration") // in hours
+  estimatedStartDate DateTime? @map("estimated_start_date")
+  estimatedEndDate   DateTime? @map("estimated_end_date")
+
+  // Internal Notes
+  internalNotes String? @map("internal_notes") @db.Text
+  assumptions   String? @db.Text // Assumptions made
+  exclusions    String? @db.Text // What's not included
+
+  // Approval Workflow
+  submittedAt   DateTime? @map("submitted_at")
+  submittedById String?   @map("submitted_by_id")
+  submittedBy   User?     @relation("EstimateSubmittedBy", fields: [submittedById], references: [id])
+
+  approvedAt   DateTime? @map("approved_at")
+  approvedById String?   @map("approved_by_id")
+  approvedBy   User?     @relation("EstimateApprovedBy", fields: [approvedById], references: [id])
+
+  rejectedAt      DateTime? @map("rejected_at")
+  rejectedById    String?   @map("rejected_by_id")
+  rejectedBy      User?     @relation("EstimateRejectedBy", fields: [rejectedById], references: [id])
+  rejectionReason String?   @map("rejection_reason") @db.Text
+
+  // Conversion to Quote
+  convertedToQuoteId String?   @unique @map("converted_to_quote_id")
+  convertedToQuote   Quote?    @relation("EstimateToQuote", fields: [convertedToQuoteId], references: [id])
+  convertedAt        DateTime? @map("converted_at")
+
+  // Audit
+  createdById String   @map("created_by_id")
+  createdBy   User     @relation("EstimateCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now()) @map("audit_create_date")
+  updatedAt   DateTime @updatedAt @map("audit_change_date")
+  updatedById String?  @map("audit_change_by")
+
+  // Relations
+  items      EstimateItem[]
+  laborItems EstimateLaborItem[]
+  activities EstimateActivity[]
+
+  @@index([serviceRequestId])
+  @@index([status])
+  @@map("estimates")
+  @@schema("fixitbh_ac")
+}
+
+model EstimateItem {
+  id         String   @id @default(cuid())
+  estimateId String   @map("estimate_id")
+  estimate   Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+
+  // Item details
+  sortOrder Int              @default(0) @map("sort_order")
+  itemType  EstimateItemType @default(MATERIAL) @map("item_type")
+
+  // Link to inventory item (optional)
+  inventoryItemId String?        @map("inventory_item_id")
+  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id])
+
+  // Item info (can override inventory item or be custom)
+  name        String
+  description String?
+  sku         String? // Part number / SKU
+
+  // Quantity & Pricing
+  quantity  Decimal @default(1) @db.Decimal(10, 3)
+  unit      String  @default("unit") // e.g., "piece", "sqm", "liter"
+  unitCost  Decimal @map("unit_cost") @db.Decimal(10, 3)
+  totalCost Decimal @map("total_cost") @db.Decimal(10, 3)
+
+  // Markup for this item (optional)
+  markupType   DiscountType? @map("markup_type")
+  markupValue  Decimal       @default(0) @map("markup_value") @db.Decimal(10, 3)
+  markupAmount Decimal       @default(0) @map("markup_amount") @db.Decimal(10, 3)
+
+  // Final price (cost + markup)
+  totalPrice Decimal @map("total_price") @db.Decimal(10, 3)
+
+  notes       String?
+  createdAt   DateTime @default(now()) @map("audit_create_date")
+  createdById String?  @map("audit_create_by")
+
+  @@map("estimate_items")
+  @@schema("fixitbh_ac")
+}
+
+model EstimateLaborItem {
+  id         String   @id @default(cuid())
+  estimateId String   @map("estimate_id")
+  estimate   Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+
+  // Labor details
+  sortOrder Int               @default(0) @map("sort_order")
+  laborType EstimateLaborType @default(TECHNICIAN) @map("labor_type")
+
+  // Worker info
+  description String // e.g., "Painter", "Helper", "Electrician"
+
+  // Time & Rate
+  quantity   Int     @default(1) // Number of workers
+  hours      Decimal @db.Decimal(10, 2) // Hours of work
+  hourlyRate Decimal @map("hourly_rate") @db.Decimal(10, 3)
+  totalCost  Decimal @map("total_cost") @db.Decimal(10, 3)
+
+  // Markup for labor (optional)
+  markupType   DiscountType? @map("markup_type")
+  markupValue  Decimal       @default(0) @map("markup_value") @db.Decimal(10, 3)
+  markupAmount Decimal       @default(0) @map("markup_amount") @db.Decimal(10, 3)
+
+  // Final price (cost + markup)
+  totalPrice Decimal @map("total_price") @db.Decimal(10, 3)
+
+  notes       String?
+  createdAt   DateTime @default(now()) @map("audit_create_date")
+  createdById String?  @map("audit_create_by")
+
+  @@map("estimate_labor_items")
+  @@schema("fixitbh_ac")
+}
+
+model EstimateActivity {
+  id            String   @id @default(cuid())
+  estimateId    String   @map("estimate_id")
+  estimate      Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  action        String // e.g., "CREATED", "SUBMITTED", "APPROVED", "REJECTED", "REVISED"
+  description   String?
+  metadata      Json? // Additional context
+  performedById String?  @map("performed_by_id")
+  performedBy   User?    @relation("EstimateActivityBy", fields: [performedById], references: [id])
+  createdAt     DateTime @default(now()) @map("audit_create_date")
+  createdById   String?  @map("audit_create_by")
+
+  @@map("estimate_activities")
+  @@schema("fixitbh_ac")
+}
+
+enum EstimateStatus {
+  DRAFT // Being prepared
+  SUBMITTED // Submitted for approval
+  PENDING_MANAGER_APPROVAL // Awaiting manager approval
+  REVISION_REQUESTED // Manager requested changes
+  APPROVED // Manager approved
+  REJECTED // Manager rejected
+  CONVERTED // Converted to customer quote
+  CANCELLED // Cancelled
+
+  @@schema("fixitbh_ac")
+}
+
+enum EstimateItemType {
+  MATERIAL // Materials/parts
+  EQUIPMENT // Equipment/tools
+  CONSUMABLE // Consumables
+  TRANSPORT // Transport/delivery
+  OTHER // Other costs
+
+  @@schema("fixitbh_ac")
+}
+
+enum EstimateLaborType {
+  TECHNICIAN // Skilled technician
+  HELPER // Helper/assistant
+  SUPERVISOR // Supervisor
+  SPECIALIST // Specialist (e.g., electrician, plumber)
+  CONTRACTOR // External contractor
+
   @@schema("fixitbh_ac")
 }
 
@@ -1469,6 +1769,7 @@ model InventoryItem {
   // Relations
   materialUsage  MaterialUsage[]
   stockMovements StockMovement[]
+  estimateItems  EstimateItem[]
 
   @@map("inventory_items")
   @@schema("fixitbh_ac")
@@ -1979,9 +2280,10 @@ model Quote {
   updatedById String?  @map("audit_change_by")
 
   // Relations
-  items       QuoteItem[]
-  attachments QuoteAttachment[]
-  activities  QuoteActivity[]
+  items        QuoteItem[]
+  attachments  QuoteAttachment[]
+  activities   QuoteActivity[]
+  fromEstimate Estimate?         @relation("EstimateToQuote")
 
   @@index([customerId])
   @@index([status])
