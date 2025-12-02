@@ -11,9 +11,9 @@ export const config = {
   // Redis
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
 
-  // JWT
+  // JWT - Secret must be set via environment variable
   jwt: {
-    secret: process.env.JWT_SECRET || 'change-me-in-production',
+    secret: process.env.JWT_SECRET || '',
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   },
@@ -41,7 +41,8 @@ export const config = {
   },
 
   // Internal Service API Key (for service-to-service communication)
-  internalApiKey: process.env.INTERNAL_API_KEY || 'agentcare-internal-dev-key-2024',
+  // Must be set via environment variable - no hardcoded default
+  internalApiKey: process.env.INTERNAL_API_KEY || '',
 
   // Logging
   logLevel: process.env.LOG_LEVEL || 'info',
@@ -53,10 +54,25 @@ export const config = {
 
 // Validate required config in production
 if (config.isProduction) {
-  const required = ['DATABASE_URL', 'JWT_SECRET', 'REDIS_URL'];
+  const required = ['DATABASE_URL', 'JWT_SECRET', 'REDIS_URL', 'INTERNAL_API_KEY'];
   for (const key of required) {
     if (!process.env[key]) {
       throw new Error(`Missing required environment variable: ${key}`);
     }
+  }
+
+  // Validate JWT secret strength in production
+  if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
+    throw new Error('JWT_SECRET must be at least 32 characters in production');
+  }
+}
+
+// Warn in development if using empty secrets
+if (config.isDevelopment) {
+  if (!config.jwt.secret) {
+    console.warn('⚠️  WARNING: JWT_SECRET not set. Please set it in .env file.');
+  }
+  if (!config.internalApiKey) {
+    console.warn('⚠️  WARNING: INTERNAL_API_KEY not set. Please set it in .env file.');
   }
 }
