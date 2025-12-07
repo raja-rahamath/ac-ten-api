@@ -32,6 +32,7 @@ import countryRoutes from './modules/countries/country.routes.js';
 import stateRoutes from './modules/states/state.routes.js';
 import districtRoutes from './modules/districts/district.routes.js';
 import governorateRoutes from './modules/governorates/governorate.routes.js';
+import areaRoutes from './modules/areas/area.routes.js';
 import jobTitleRoutes from './modules/job-titles/job-title.routes.js';
 import propertyTypeRoutes from './modules/property-types/property-type.routes.js';
 import assetTypeRoutes from './modules/asset-types/asset-type.routes.js';
@@ -63,6 +64,9 @@ import notificationRoutes from './modules/notifications/notification.routes.js';
 import membershipRoutes from './modules/memberships/membership.routes.js';
 import reviewRoutes from './modules/reviews/review.routes.js';
 import commentRoutes from './modules/comments/comment.routes.js';
+import laborRateTypeRoutes from './modules/labor-rate-types/labor-rate-type.routes.js';
+import currencyRoutes from './modules/currencies/currency.routes.js';
+import inventoryItemRoutes from './modules/inventory-items/inventory-item.routes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -154,6 +158,7 @@ export function createApp(): Express {
   apiRouter.use('/states', stateRoutes);
   apiRouter.use('/districts', districtRoutes);
   apiRouter.use('/governorates', governorateRoutes);
+  apiRouter.use('/areas', areaRoutes);
   apiRouter.use('/job-titles', jobTitleRoutes);
   apiRouter.use('/property-types', propertyTypeRoutes);
   apiRouter.use('/asset-types', assetTypeRoutes);
@@ -185,6 +190,9 @@ export function createApp(): Express {
   apiRouter.use('/memberships', membershipRoutes);
   apiRouter.use('/reviews', reviewRoutes);
   apiRouter.use('/comments', commentRoutes);
+  apiRouter.use('/labor-rate-types', laborRateTypeRoutes);
+  apiRouter.use('/currencies', currencyRoutes);
+  apiRouter.use('/inventory-items', inventoryItemRoutes);
 
   app.use(`/api/${config.apiVersion}`, apiRouter);
 

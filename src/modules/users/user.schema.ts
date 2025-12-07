@@ -43,6 +43,14 @@ export const listUsersSchema = z.object({
   }),
 });
 
+export const changePasswordSchema = z.object({
+  body: z.object({
+    currentPassword: z.string().min(1, 'Current password is required'),
+    newPassword: z.string().min(6, 'New password must be at least 6 characters'),
+  }),
+});
+
 export type CreateUserInput = z.infer<typeof createUserSchema>['body'];
 export type UpdateUserInput = z.infer<typeof updateUserSchema>['body'];
 export type ListUsersQuery = z.infer<typeof listUsersSchema>['query'];
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>['body'];

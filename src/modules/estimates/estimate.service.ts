@@ -54,13 +54,22 @@ export class EstimateService {
     return { totalCost, markupAmount, totalPrice };
   }
 
-  // Calculate labor item totals
+  // Calculate labor item totals - supports both hourly and daily rates
   private calculateLaborItemTotals(item: EstimateLaborItemInput): {
     totalCost: number;
     markupAmount: number;
     totalPrice: number;
   } {
-    const totalCost = item.quantity * item.hours * item.hourlyRate;
+    let totalCost: number;
+
+    // Calculate based on rate type
+    if (item.rateType === 'DAILY') {
+      // Daily rate calculation: workers * days * daily rate
+      totalCost = item.quantity * (item.days || 0) * (item.dailyRate || 0);
+    } else {
+      // Hourly rate calculation (default): workers * hours * hourly rate
+      totalCost = item.quantity * (item.hours || 0) * (item.hourlyRate || 0);
+    }
 
     let markupAmount = 0;
     if (item.markupType && item.markupValue > 0) {
@@ -84,7 +93,8 @@ export class EstimateService {
     profitMarginValue: number,
     vatRate: number,
     discountType: DiscountType | null | undefined,
-    discountValue: number
+    discountValue: number,
+    transportCost: number = 0
   ) {
     // Sum costs by category
     const materialCost = items
@@ -98,10 +108,10 @@ export class EstimateService {
       .reduce((sum, i) => sum + i.totalCost, 0);
     const laborCost = laborItems.reduce((sum, i) => sum + i.totalCost, 0);
 
-    // Subtotal is sum of all prices (including markups)
+    // Subtotal is sum of all prices (including markups) plus transport
     const itemsTotal = items.reduce((sum, i) => sum + i.totalPrice, 0);
     const laborTotal = laborItems.reduce((sum, i) => sum + i.totalPrice, 0);
-    const subtotal = itemsTotal + laborTotal;
+    const subtotal = itemsTotal + laborTotal + transportCost;
 
     // Calculate profit margin
     let profitAmount = 0;
@@ -182,7 +192,7 @@ export class EstimateService {
       ...this.calculateLaborItemTotals(item),
     }));
 
-    // Calculate estimate totals
+    // Calculate estimate totals (including transport cost)
     const totals = this.calculateEstimateTotals(
       itemsWithTotals,
       laborItemsWithTotals,
@@ -190,7 +200,8 @@ export class EstimateService {
       data.profitMarginValue || 0,
       data.vatRate || 10,
       data.discountType as DiscountType | null,
-      data.discountValue || 0
+      data.discountValue || 0,
+      data.transportCost || 0
     );
 
     const estimate = await prisma.estimate.create({
@@ -207,6 +218,7 @@ export class EstimateService {
         materialCost: totals.materialCost,
         laborCost: totals.laborCost,
         equipmentCost: totals.equipmentCost,
+        transportCost: data.transportCost || 0,
         otherCost: totals.otherCost,
         subtotal: totals.subtotal,
 
@@ -267,10 +279,14 @@ export class EstimateService {
           create: laborItemsWithTotals.map((item) => ({
             sortOrder: item.sortOrder,
             laborType: item.laborType,
+            laborRateTypeId: item.laborRateTypeId || null,
             description: item.description,
             quantity: item.quantity,
-            hours: item.hours,
-            hourlyRate: item.hourlyRate,
+            rateType: item.rateType || 'HOURLY',
+            hours: item.hours || 0,
+            days: item.days || 0,
+            hourlyRate: item.hourlyRate || 0,
+            dailyRate: item.dailyRate || 0,
             totalCost: item.totalCost,
             markupType: item.markupType as DiscountType | null,
             markupValue: item.markupValue || 0,
@@ -944,6 +960,263 @@ export class EstimateService {
       totalValue: totalValue._sum.total || 0,
       approvedValue: approvedValue._sum.total || 0,
       approvalRate: Math.round(approvalRate * 100) / 100,
+    };
+  }
+
+  // Create a revision from a rejected estimate
+  async createRevision(id: string, userId: string) {
+    const estimate = await prisma.estimate.findUnique({
+      where: { id },
+      include: {
+        items: true,
+        laborItems: true,
+      },
+    });
+
+    if (!estimate) {
+      throw new Error('Estimate not found');
+    }
+
+    if (estimate.status !== 'REJECTED' && estimate.status !== 'REVISION_REQUESTED') {
+      throw new Error('Only rejected or revision-requested estimates can be revised');
+    }
+
+    // Generate new estimate number with version
+    const estimateNo = await this.generateEstimateNo();
+    const newVersion = estimate.version + 1;
+
+    // Create new estimate as a revision
+    const newEstimate = await prisma.estimate.create({
+      data: {
+        estimateNo,
+        serviceRequestId: estimate.serviceRequestId,
+        siteVisitId: estimate.siteVisitId,
+        parentEstimateId: estimate.id,
+        version: newVersion,
+        isLatestVersion: true,
+        title: estimate.title,
+        description: estimate.description,
+        scope: estimate.scope,
+        status: 'DRAFT',
+
+        // Copy costs
+        materialCost: estimate.materialCost,
+        laborCost: estimate.laborCost,
+        equipmentCost: estimate.equipmentCost,
+        transportCost: estimate.transportCost,
+        otherCost: estimate.otherCost,
+        subtotal: estimate.subtotal,
+
+        // Copy profit settings
+        profitMarginType: estimate.profitMarginType,
+        profitMarginValue: estimate.profitMarginValue,
+        profitAmount: estimate.profitAmount,
+
+        // Copy VAT
+        vatRate: estimate.vatRate,
+        vatAmount: estimate.vatAmount,
+
+        // Copy discount
+        discountType: estimate.discountType,
+        discountValue: estimate.discountValue,
+        discountAmount: estimate.discountAmount,
+        discountReason: estimate.discountReason,
+
+        // Copy totals
+        totalBeforeVat: estimate.totalBeforeVat,
+        total: estimate.total,
+
+        // Copy timeline
+        estimatedDuration: estimate.estimatedDuration,
+        estimatedStartDate: estimate.estimatedStartDate,
+        estimatedEndDate: estimate.estimatedEndDate,
+
+        // Copy notes
+        internalNotes: estimate.internalNotes,
+        assumptions: estimate.assumptions,
+        exclusions: estimate.exclusions,
+
+        createdById: userId,
+
+        // Copy items
+        items: {
+          create: estimate.items.map((item) => ({
+            sortOrder: item.sortOrder,
+            itemType: item.itemType,
+            inventoryItemId: item.inventoryItemId,
+            name: item.name,
+            description: item.description,
+            sku: item.sku,
+            quantity: item.quantity,
+            unit: item.unit,
+            unitCost: item.unitCost,
+            totalCost: item.totalCost,
+            markupType: item.markupType,
+            markupValue: item.markupValue,
+            markupAmount: item.markupAmount,
+            totalPrice: item.totalPrice,
+            notes: item.notes,
+          })),
+        },
+
+        // Copy labor items
+        laborItems: {
+          create: estimate.laborItems.map((item) => ({
+            sortOrder: item.sortOrder,
+            laborType: item.laborType,
+            laborRateTypeId: item.laborRateTypeId,
+            description: item.description,
+            quantity: item.quantity,
+            rateType: item.rateType,
+            hours: item.hours,
+            days: item.days,
+            hourlyRate: item.hourlyRate,
+            dailyRate: item.dailyRate,
+            totalCost: item.totalCost,
+            markupType: item.markupType,
+            markupValue: item.markupValue,
+            markupAmount: item.markupAmount,
+            totalPrice: item.totalPrice,
+            notes: item.notes,
+          })),
+        },
+
+        // Activity
+        activities: {
+          create: {
+            action: 'REVISION_CREATED',
+            description: `Revision V${newVersion} created from V${estimate.version}`,
+            metadata: { parentEstimateId: estimate.id, parentVersion: estimate.version },
+            performedById: userId,
+          },
+        },
+      },
+      include: {
+        serviceRequest: {
+          include: {
+            customer: true,
+            zone: true,
+          },
+        },
+        items: { orderBy: { sortOrder: 'asc' } },
+        laborItems: { orderBy: { sortOrder: 'asc' } },
+        createdBy: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+
+    // Mark the old estimate as no longer latest version
+    await prisma.estimate.update({
+      where: { id },
+      data: {
+        isLatestVersion: false,
+        activities: {
+          create: {
+            action: 'SUPERSEDED',
+            description: `Superseded by revision V${newVersion}`,
+            metadata: { newEstimateId: newEstimate.id },
+            performedById: userId,
+          },
+        },
+      },
+    });
+
+    return newEstimate;
+  }
+
+  // Get version history for an estimate
+  async getVersionHistory(id: string) {
+    // First, find the estimate to get its root
+    const estimate = await prisma.estimate.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        parentEstimateId: true,
+        serviceRequestId: true,
+      },
+    });
+
+    if (!estimate) {
+      throw new Error('Estimate not found');
+    }
+
+    // Find the root estimate (one without a parent) by traversing up
+    let rootId = id;
+    let currentParentId = estimate.parentEstimateId;
+    while (currentParentId) {
+      const parent = await prisma.estimate.findUnique({
+        where: { id: currentParentId },
+        select: {
+          id: true,
+          parentEstimateId: true,
+        },
+      });
+      if (!parent) break;
+      rootId = parent.id;
+      currentParentId = parent.parentEstimateId;
+    }
+
+    // Get all estimates in this version chain (all estimates for same service request with same root)
+    // We'll find all estimates that share the same serviceRequestId and are part of the version chain
+    const allVersions = await prisma.estimate.findMany({
+      where: {
+        serviceRequestId: estimate.serviceRequestId,
+        OR: [
+          { id: rootId },
+          { parentEstimateId: { not: null } },
+        ],
+      },
+      select: {
+        id: true,
+        estimateNo: true,
+        version: true,
+        status: true,
+        total: true,
+        isLatestVersion: true,
+        parentEstimateId: true,
+        createdAt: true,
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        rejectedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        rejectedAt: true,
+        rejectionReason: true,
+      },
+      orderBy: { version: 'asc' },
+    });
+
+    // Filter to only include estimates in this specific version chain
+    const versionChain: typeof allVersions = [];
+    const visited = new Set<string>();
+
+    // Start from root and follow the chain
+    versionChain.push(...allVersions.filter(e => e.id === rootId));
+    visited.add(rootId);
+
+    // Then add all children recursively
+    const addChildren = (parentId: string) => {
+      const children = allVersions.filter(e => e.parentEstimateId === parentId && !visited.has(e.id));
+      for (const child of children) {
+        versionChain.push(child);
+        visited.add(child.id);
+        addChildren(child.id);
+      }
+    };
+    addChildren(rootId);
+
+    return {
+      currentEstimateId: id,
+      rootEstimateId: rootId,
+      versions: versionChain,
     };
   }
 }

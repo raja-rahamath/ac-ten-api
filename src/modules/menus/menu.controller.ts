@@ -146,4 +146,24 @@ export class MenuController {
       next(error);
     }
   }
+
+  async getMyDashboardWidgets(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      const widgets = await menuService.getUserDashboardWidgets(userId);
+      res.json({
+        success: true,
+        data: widgets,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

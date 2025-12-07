@@ -4,7 +4,7 @@ import { CreateRoleInput, UpdateRoleInput, ListRolesQuery, UpdateRolePermissions
 
 export class RoleService {
   async create(input: CreateRoleInput) {
-    const { permissions, ...roleData } = input;
+    const { permissions, dashboardWidgets, ...roleData } = input;
 
     // Check if role name exists
     const existing = await prisma.role.findUnique({
@@ -16,7 +16,10 @@ export class RoleService {
     }
 
     const role = await prisma.role.create({
-      data: roleData,
+      data: {
+        ...roleData,
+        dashboardWidgets: dashboardWidgets || [],
+      },
       include: {
         permissions: {
           include: {
@@ -123,7 +126,7 @@ export class RoleService {
   }
 
   async update(id: string, input: UpdateRoleInput) {
-    const { permissions, ...roleData } = input;
+    const { permissions, dashboardWidgets, ...roleData } = input;
 
     const existing = await prisma.role.findUnique({
       where: { id },
@@ -133,9 +136,31 @@ export class RoleService {
       throw new NotFoundError('Role not found');
     }
 
-    // Prevent modifying system roles
+    // For system roles, only allow permission and dashboardWidgets updates (not name, displayName, description changes)
     if (existing.isSystem) {
-      throw new ConflictError('Cannot modify system role');
+      // Check if there are actual changes to protected fields (not just presence of fields)
+      const hasActualChanges =
+        (roleData.name !== undefined && roleData.name !== existing.name) ||
+        (roleData.displayName !== undefined && roleData.displayName !== existing.displayName) ||
+        (roleData.description !== undefined && roleData.description !== existing.description);
+
+      if (hasActualChanges) {
+        throw new ConflictError('Cannot modify system role properties. Only permissions and dashboard widgets can be updated.');
+      }
+
+      // Update dashboardWidgets for system roles
+      if (dashboardWidgets !== undefined) {
+        await prisma.role.update({
+          where: { id },
+          data: { dashboardWidgets },
+        });
+      }
+
+      // Update permissions for system roles
+      if (permissions !== undefined) {
+        await this.updatePermissions(id, { permissions });
+      }
+      return this.findById(id);
     }
 
     // Check name uniqueness if being updated
@@ -148,9 +173,15 @@ export class RoleService {
       }
     }
 
+    // Build update data including dashboardWidgets if provided
+    const updateData: any = { ...roleData };
+    if (dashboardWidgets !== undefined) {
+      updateData.dashboardWidgets = dashboardWidgets;
+    }
+
     await prisma.role.update({
       where: { id },
-      data: roleData,
+      data: updateData,
     });
 
     // Update permissions if provided
@@ -177,8 +208,32 @@ export class RoleService {
 
     // Add new permissions
     if (input.permissions.length > 0) {
+      // Support both permission IDs and "resource:action" string format
+      const permissionStrings = input.permissions.filter(p => p.includes(':'));
+      const permissionIds = input.permissions.filter(p => !p.includes(':'));
+
+      // Build OR conditions for lookup
+      const orConditions: any[] = [];
+
+      if (permissionIds.length > 0) {
+        orConditions.push({ id: { in: permissionIds } });
+      }
+
+      if (permissionStrings.length > 0) {
+        // Parse "resource:action" strings
+        const parsedPermissions = permissionStrings.map(p => {
+          const [resource, action] = p.split(':');
+          return { resource, action };
+        });
+
+        // Add each parsed permission as an AND condition
+        parsedPermissions.forEach(({ resource, action }) => {
+          orConditions.push({ resource, action });
+        });
+      }
+
       const permissionRecords = await prisma.permission.findMany({
-        where: { id: { in: input.permissions } },
+        where: { OR: orConditions },
       });
 
       await prisma.rolePermission.createMany({

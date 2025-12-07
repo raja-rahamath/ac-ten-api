@@ -50,7 +50,11 @@ export class AuthService {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        role: user.role?.name,
+        role: user.role ? {
+          id: user.role.id,
+          name: user.role.name,
+          displayName: user.role.displayName,
+        } : null,
       },
     };
   }
@@ -130,7 +134,11 @@ export class AuthService {
         email: result.email,
         firstName: result.firstName,
         lastName: result.lastName,
-        role: result.role?.name,
+        role: result.role ? {
+          id: result.role.id,
+          name: result.role.name,
+          displayName: result.role.displayName,
+        } : null,
       },
     };
   }
@@ -191,7 +199,11 @@ export class AuthService {
       firstName: user.firstName,
       lastName: user.lastName,
       phone: user.phone,
-      role: user.role?.name,
+      role: user.role ? {
+        id: user.role.id,
+        name: user.role.name,
+        displayName: user.role.displayName,
+      } : null,
       isActive: user.isActive,
       isVerified: user.isVerified,
       employee: user.employee ? {

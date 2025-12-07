@@ -15,9 +15,10 @@ const controller = new MenuController();
 
 router.use(authenticate);
 
-// Current user's menus and zones
+// Current user's menus, zones, and dashboard widgets
 router.get('/me', controller.getMyMenus.bind(controller));
 router.get('/me/zones', controller.getMyZones.bind(controller));
+router.get('/me/dashboard-widgets', controller.getMyDashboardWidgets.bind(controller));
 
 // Menu Items CRUD (admin only)
 router.post(

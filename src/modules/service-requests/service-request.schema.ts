@@ -59,6 +59,9 @@ export const listServiceRequestsSchema = z.object({
     assignedEmployeeId: z.string().optional(),
     zoneId: z.string().optional(),
     zoneIds: z.string().optional(), // Comma-separated zone IDs for technicians
+    complaintTypeId: z.string().optional(),
+    dateFrom: z.string().optional(), // ISO date string for start of date range
+    dateTo: z.string().optional(), // ISO date string for end of date range
   }),
 });
 

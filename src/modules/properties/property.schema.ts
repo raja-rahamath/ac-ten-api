@@ -5,7 +5,7 @@ export const createPropertySchema = z.object({
     name: z.string().min(1, 'Property name is required'),
     nameAr: z.string().optional(),
     typeId: z.string().min(1, 'Property type is required'),
-    zoneId: z.string().optional(),
+    areaId: z.string().optional(),
     address: z.string().optional(),
     addressAr: z.string().optional(),
     building: z.string().optional(),
@@ -28,7 +28,7 @@ export const updatePropertySchema = z.object({
     name: z.string().min(1).optional(),
     nameAr: z.string().optional(),
     typeId: z.string().optional(),
-    zoneId: z.string().optional(),
+    areaId: z.string().optional(),
     address: z.string().optional(),
     addressAr: z.string().optional(),
     building: z.string().optional(),
@@ -53,7 +53,7 @@ export const listPropertiesSchema = z.object({
     search: z.string().optional(),
     customerId: z.string().optional(),
     typeId: z.string().optional(),
-    zoneId: z.string().optional(),
+    areaId: z.string().optional(),
     isActive: z.preprocess(
       (val) => val === 'true' ? true : val === 'false' ? false : undefined,
       z.boolean().optional()

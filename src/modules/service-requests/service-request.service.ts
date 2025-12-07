@@ -8,25 +8,19 @@ import {
 } from './service-request.schema.js';
 
 async function generateRequestNo(): Promise<string> {
-  // Get the highest existing request number
-  const lastRequest = await prisma.serviceRequest.findFirst({
-    where: {
-      requestNo: {
-        startsWith: 'SR-',
-      },
-    },
-    orderBy: {
-      requestNo: 'desc',
-    },
-    select: {
-      requestNo: true,
-    },
-  });
+  // Get all service requests with the SR-##### format to find the highest number
+  const requests = await prisma.$queryRaw<{ request_no: string }[]>`
+    SELECT request_no
+    FROM fixitbh_ac.service_requests
+    WHERE request_no ~ '^SR-[0-9]+$'
+    ORDER BY CAST(SUBSTRING(request_no FROM 4) AS INTEGER) DESC
+    LIMIT 1
+  `;
 
   let nextNumber = 1;
-  if (lastRequest?.requestNo) {
+  if (requests.length > 0 && requests[0].request_no) {
     // Extract the number part from SR-00001 format
-    const match = lastRequest.requestNo.match(/SR-(\d+)/);
+    const match = requests[0].request_no.match(/SR-(\d+)/);
     if (match) {
       nextNumber = parseInt(match[1], 10) + 1;
     }
@@ -37,7 +31,7 @@ async function generateRequestNo(): Promise<string> {
 }
 
 export class ServiceRequestService {
-  async create(input: CreateServiceRequestInput) {
+  async create(input: CreateServiceRequestInput, userId?: string) {
     // Validate customer exists
     const customer = await prisma.customer.findUnique({
       where: { id: input.customerId },
@@ -48,14 +42,16 @@ export class ServiceRequestService {
 
     // Validate property exists - check Unit first, then legacy Property
     let zoneId = input.zoneId;
+    let zoneHeadId: string | null = null;
     let unitId: string | null = null;
     let propertyId: string | null = null;
+    let areaId: string | null = null;
 
     const unit = await prisma.unit.findUnique({
       where: { id: input.propertyId },
       include: {
         building: {
-          select: { zoneId: true },
+          select: { areaId: true },
         },
       },
     });
@@ -63,10 +59,8 @@ export class ServiceRequestService {
     if (unit) {
       // It's a Unit - store in unitId field
       unitId = unit.id;
-      // Derive zoneId from unit's building if not provided
-      if (!zoneId && unit.building?.zoneId) {
-        zoneId = unit.building.zoneId;
-      }
+      // Get areaId from unit's building
+      areaId = unit.building?.areaId || null;
     } else {
       // Fall back to legacy Property model
       const property = await prisma.property.findUnique({
@@ -77,6 +71,32 @@ export class ServiceRequestService {
       }
       // It's a Property - store in propertyId field
       propertyId = property.id;
+      // Get areaId from property
+      areaId = property.areaId || null;
+    }
+
+    // Derive zoneId from area if not provided
+    if (!zoneId && areaId) {
+      // Look up the zone that contains this area
+      const zoneArea = await prisma.zoneArea.findFirst({
+        where: { areaId, isActive: true },
+        include: {
+          zone: {
+            select: { id: true, headId: true },
+          },
+        },
+      });
+      if (zoneArea?.zone) {
+        zoneId = zoneArea.zone.id;
+        zoneHeadId = zoneArea.zone.headId;
+      }
+    } else if (zoneId && !zoneHeadId) {
+      // If zoneId was provided directly, still get the zone head
+      const zone = await prisma.zone.findUnique({
+        where: { id: zoneId },
+        select: { headId: true },
+      });
+      zoneHeadId = zone?.headId || null;
     }
 
     // Validate zone exists - zoneId is required
@@ -91,7 +111,7 @@ export class ServiceRequestService {
       throw new NotFoundError('Zone not found');
     }
 
-    // Validate complaint type exists
+    // Validate complaint type exists and get its department
     const complaintType = await prisma.complaintType.findUnique({
       where: { id: input.complaintTypeId },
     });
@@ -99,30 +119,91 @@ export class ServiceRequestService {
       throw new NotFoundError('Complaint type not found');
     }
 
-    // Find zone head for auto-assignment
-    const zoneHead = await prisma.employeeZone.findFirst({
-      where: {
-        zoneId: zoneId,
-        role: { in: ['PRIMARY_HEAD', 'SECONDARY_HEAD'] },
-        isActive: true,
-        employee: {
+    // Find employee for auto-assignment based on zone AND department match
+    // Priority:
+    // 1. Find an employee in the zone who belongs to the same department as the complaint type
+    // 2. Fall back to zone head if no department-matching employee found
+    let assignedEmployeeId: string | null = null;
+    let assignedEmployee: { employee: { id: string; firstName: string; lastName: string } } | null = null;
+    let assignmentReason = 'zone head';
+
+    // If complaint type has a department, try to find a matching employee in the zone
+    if (complaintType.departmentId && zoneId) {
+      const departmentEmployee = await prisma.employeeZone.findFirst({
+        where: {
+          zoneId: zoneId,
           isActive: true,
-        },
-      },
-      orderBy: [
-        // Prefer PRIMARY_HEAD over SECONDARY_HEAD
-        { role: 'asc' },
-      ],
-      include: {
-        employee: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
+          employee: {
+            isActive: true,
+            departmentId: complaintType.departmentId,
           },
         },
-      },
-    });
+        include: {
+          employee: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              department: {
+                select: { name: true },
+              },
+            },
+          },
+        },
+      });
+
+      if (departmentEmployee?.employee) {
+        assignedEmployeeId = departmentEmployee.employee.id;
+        assignedEmployee = { employee: departmentEmployee.employee };
+        assignmentReason = `department match (${departmentEmployee.employee.department?.name || 'Unknown'})`;
+      }
+    }
+
+    // Fall back to zone head if no department-matching employee found
+    if (!assignedEmployeeId && zoneHeadId) {
+      // Verify the employee is active
+      const zoneHeadEmployee = await prisma.employee.findUnique({
+        where: { id: zoneHeadId, isActive: true },
+        select: { id: true, firstName: true, lastName: true },
+      });
+      if (zoneHeadEmployee) {
+        assignedEmployeeId = zoneHeadEmployee.id;
+        assignedEmployee = { employee: zoneHeadEmployee };
+        assignmentReason = 'zone head';
+      }
+    }
+
+    // Fall back to EmployeeZone table if no direct zone head found
+    if (!assignedEmployeeId) {
+      const fallbackZoneHead = await prisma.employeeZone.findFirst({
+        where: {
+          zoneId: zoneId,
+          role: { in: ['PRIMARY_HEAD', 'SECONDARY_HEAD'] },
+          isActive: true,
+          employee: {
+            isActive: true,
+          },
+        },
+        orderBy: [
+          // Prefer PRIMARY_HEAD over SECONDARY_HEAD
+          { role: 'asc' },
+        ],
+        include: {
+          employee: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+      });
+      if (fallbackZoneHead?.employee) {
+        assignedEmployeeId = fallbackZoneHead.employee.id;
+        assignedEmployee = { employee: fallbackZoneHead.employee };
+        assignmentReason = 'zone head (fallback)';
+      }
+    }
 
     const requestNo = await generateRequestNo();
 
@@ -139,8 +220,8 @@ export class ServiceRequestService {
         priority: input.priority as any,
         title: input.title,
         description: input.description,
-        status: zoneHead ? 'ASSIGNED' : 'NEW',
-        assignedToId: zoneHead?.employee.id,
+        status: assignedEmployeeId ? 'ASSIGNED' : 'NEW',
+        assignedToId: assignedEmployeeId,
       },
       include: {
         customer: true,
@@ -158,16 +239,17 @@ export class ServiceRequestService {
         serviceRequestId: serviceRequest.id,
         action: 'REQUEST_CREATED',
         description: 'Service request created',
+        performedBy: userId,
       },
     });
 
-    // Create timeline entry for auto-assignment if zone head found
-    if (zoneHead) {
+    // Create timeline entry for auto-assignment if employee found
+    if (assignedEmployee) {
       await prisma.requestTimeline.create({
         data: {
           serviceRequestId: serviceRequest.id,
           action: 'AUTO_ASSIGNED',
-          description: `Auto-assigned to zone head: ${zoneHead.employee.firstName} ${zoneHead.employee.lastName}`,
+          description: `Auto-assigned to ${assignedEmployee.employee.firstName} ${assignedEmployee.employee.lastName} (${assignmentReason})`,
         },
       });
     }
@@ -216,7 +298,7 @@ export class ServiceRequestService {
   }
 
   async findAll(query: ListServiceRequestsQuery) {
-    const { search, status, priority, customerId, assignedEmployeeId, zoneId, zoneIds } = query;
+    const { search, status, priority, customerId, assignedEmployeeId, zoneId, zoneIds, complaintTypeId, dateFrom, dateTo } = query;
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -235,6 +317,21 @@ export class ServiceRequestService {
     if (priority) where.priority = priority;
     if (customerId) where.customerId = customerId;
     if (assignedEmployeeId) where.assignedToId = assignedEmployeeId;
+    if (complaintTypeId) where.complaintTypeId = complaintTypeId;
+
+    // Date range filter
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) {
+        where.createdAt.gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        // Add 1 day to include the end date fully
+        const endDate = new Date(dateTo);
+        endDate.setDate(endDate.getDate() + 1);
+        where.createdAt.lte = endDate;
+      }
+    }
 
     // Support both single zoneId and multiple zoneIds (comma-separated)
     if (zoneIds) {
@@ -331,7 +428,17 @@ export class ServiceRequestService {
     }
 
     const updateData: any = {};
-    if (input.status) updateData.status = input.status;
+    if (input.status) {
+      updateData.status = input.status;
+      // Set startedAt when status changes to IN_PROGRESS
+      if (input.status === 'IN_PROGRESS' && existing.status !== 'IN_PROGRESS' && !existing.startedAt) {
+        updateData.startedAt = new Date();
+      }
+      // Set completedAt when status changes to COMPLETED
+      if (input.status === 'COMPLETED' && existing.status !== 'COMPLETED') {
+        updateData.completedAt = new Date();
+      }
+    }
     if (input.priority) updateData.priority = input.priority;
     if (input.title) updateData.title = input.title;
     if (input.description !== undefined) updateData.description = input.description;

@@ -41,7 +41,7 @@ export class CustomerService {
               include: {
                 building: {
                   include: {
-                    zone: true,
+                    area: true,
                   },
                 },
                 type: true,
@@ -96,7 +96,7 @@ export class CustomerService {
           include: {
             building: {
               include: {
-                zone: true,
+                area: true,
               },
             },
             type: true,

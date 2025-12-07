@@ -8,6 +8,7 @@ import {
   getRoleSchema,
   listRolesSchema,
   updateRolePermissionsSchema,
+  DASHBOARD_WIDGETS,
 } from './role.schema.js';
 
 const router = Router();
@@ -33,6 +34,15 @@ router.get(
   '/permissions',
   authorize('roles:read'),
   controller.getPermissions.bind(controller)
+);
+
+// Get available dashboard widgets
+router.get(
+  '/dashboard-widgets',
+  authorize('roles:read'),
+  (_req, res) => {
+    res.json({ success: true, data: DASHBOARD_WIDGETS });
+  }
 );
 
 router.get(

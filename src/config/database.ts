@@ -7,6 +7,20 @@ const globalForPrisma = globalThis as unknown as {
   prisma: ReturnType<typeof createPrismaClient> | undefined;
 };
 
+// Models that don't have createdById/updatedById fields (join tables, etc.)
+const MODELS_WITHOUT_AUDIT_FIELDS = new Set([
+  'RolePermission',
+  'RoleMenuPermission',
+  'ZoneArea',
+  'EmployeeZone',
+  'ScheduleTeam',
+  'WorkOrderTeam',
+  'CustomerProperty',
+  'CustomerUnit',
+  'AmcContractProperty',
+  'AmcContractService',
+]);
+
 function createPrismaClient() {
   const baseClient = new PrismaClient({
     log: config.isDevelopment
@@ -30,6 +44,11 @@ function createPrismaClient() {
     query: {
       $allModels: {
         async create({ model, args, query }) {
+          // Skip models without audit fields
+          if (MODELS_WITHOUT_AUDIT_FIELDS.has(model)) {
+            return query(args);
+          }
+
           const userId = getCurrentUserId();
 
           // Add createdById if not already set and model has this field
@@ -44,6 +63,11 @@ function createPrismaClient() {
         },
 
         async createMany({ model, args, query }) {
+          // Skip models without audit fields
+          if (MODELS_WITHOUT_AUDIT_FIELDS.has(model)) {
+            return query(args);
+          }
+
           const userId = getCurrentUserId();
 
           if (userId && args.data) {
@@ -63,6 +87,11 @@ function createPrismaClient() {
         },
 
         async update({ model, args, query }) {
+          // Skip models without audit fields
+          if (MODELS_WITHOUT_AUDIT_FIELDS.has(model)) {
+            return query(args);
+          }
+
           const userId = getCurrentUserId();
 
           // Add updatedById if not already set
@@ -77,6 +106,11 @@ function createPrismaClient() {
         },
 
         async updateMany({ model, args, query }) {
+          // Skip models without audit fields
+          if (MODELS_WITHOUT_AUDIT_FIELDS.has(model)) {
+            return query(args);
+          }
+
           const userId = getCurrentUserId();
 
           if (userId && args.data && typeof args.data === 'object') {
@@ -90,6 +124,11 @@ function createPrismaClient() {
         },
 
         async upsert({ model, args, query }) {
+          // Skip models without audit fields
+          if (MODELS_WITHOUT_AUDIT_FIELDS.has(model)) {
+            return query(args);
+          }
+
           const userId = getCurrentUserId();
 
           if (userId) {

@@ -46,7 +46,7 @@ export class UnitService {
           include: {
             block: {
               include: {
-                zone: true,
+                area: true,
               },
             },
             road: true,
@@ -78,7 +78,7 @@ export class UnitService {
             type: true,
             block: {
               include: {
-                zone: {
+                area: {
                   include: {
                     governorate: {
                       include: {
@@ -192,7 +192,7 @@ export class UnitService {
               block: {
                 select: {
                   blockNo: true,
-                  zone: {
+                  area: {
                     select: {
                       name: true,
                     },

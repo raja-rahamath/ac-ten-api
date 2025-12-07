@@ -39,7 +39,7 @@ export class GovernorateService {
         },
         _count: {
           select: {
-            zones: true,
+            areas: true,
           },
         },
       },
@@ -61,7 +61,7 @@ export class GovernorateService {
             },
           },
         },
-        zones: {
+        areas: {
           select: {
             id: true,
             name: true,
@@ -73,7 +73,7 @@ export class GovernorateService {
         },
         _count: {
           select: {
-            zones: true,
+            areas: true,
           },
         },
       },
@@ -125,7 +125,7 @@ export class GovernorateService {
           },
           _count: {
             select: {
-              zones: true,
+              areas: true,
             },
           },
         },
@@ -198,7 +198,7 @@ export class GovernorateService {
         },
         _count: {
           select: {
-            zones: true,
+            areas: true,
           },
         },
       },

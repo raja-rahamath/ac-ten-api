@@ -20,7 +20,7 @@ export class RoadService {
       include: {
         block: {
           include: {
-            zone: {
+            area: {
               include: {
                 governorate: {
                   include: {
@@ -51,7 +51,7 @@ export class RoadService {
       include: {
         block: {
           include: {
-            zone: {
+            area: {
               include: {
                 governorate: {
                   include: {

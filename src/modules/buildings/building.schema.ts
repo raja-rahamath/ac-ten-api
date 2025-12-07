@@ -10,7 +10,7 @@ export const createBuildingSchema = z.object({
     name: z.string().optional(), // Building name (optional - not all buildings have names)
     nameAr: z.string().optional(),
     typeId: z.string().optional(), // Building type ID (optional)
-    zoneId: z.string().optional(), // Zone ID for geographic context
+    areaId: z.string().optional(), // Area ID for geographic context
     totalFloors: z.number().int().min(1).default(1),
     totalUnits: z.number().int().min(0).default(0),
     yearBuilt: z.number().int().optional(),
@@ -36,7 +36,7 @@ export const updateBuildingSchema = z.object({
     name: z.string().optional(),
     nameAr: z.string().optional(),
     typeId: z.string().optional(),
-    zoneId: z.string().optional(),
+    areaId: z.string().optional(),
     totalFloors: z.number().int().min(1).optional(),
     totalUnits: z.number().int().min(0).optional(),
     yearBuilt: z.number().int().optional(),
@@ -66,7 +66,7 @@ export const listBuildingsSchema = z.object({
     typeId: z.string().optional(),
     blockNumber: z.string().optional(),
     roadNumber: z.string().optional(),
-    zoneId: z.string().optional(),
+    areaId: z.string().optional(),
     isActive: z.string().transform(v => v === 'true').optional(),
   }),
 });

@@ -144,7 +144,7 @@ export class ReportService {
         _count: true,
       }),
       prisma.serviceRequest.groupBy({
-        by: ['type'],
+        by: ['requestType'],
         where: baseWhere,
         _count: true,
       }),
@@ -178,7 +178,7 @@ export class ReportService {
       period: { from: fromDate, to: toDate },
       total,
       byStatus: byStatus.map((s) => ({ status: s.status, count: s._count })),
-      byType: byType.map((t) => ({ type: t.type, count: t._count })),
+      byType: byType.map((t) => ({ type: t.requestType, count: t._count })),
       trend,
       recentRequests,
     };
@@ -302,10 +302,10 @@ export class ReportService {
       prisma.amcContract.groupBy({
         by: ['status'],
         _count: true,
-        _sum: { totalAmount: true },
+        _sum: { contractValue: true },
       }),
       // Upcoming visits (next 30 days)
-      prisma.amcSchedule.count({
+      prisma.amcServiceSchedule.count({
         where: {
           scheduledDate: {
             gte: new Date(),
@@ -315,21 +315,21 @@ export class ReportService {
         },
       }),
       // Completed visits in period
-      prisma.amcSchedule.count({
+      prisma.amcServiceSchedule.count({
         where: {
           completedAt: { gte: fromDate, lte: toDate },
           status: 'COMPLETED',
         },
       }),
       // Overdue visits
-      prisma.amcSchedule.count({
+      prisma.amcServiceSchedule.count({
         where: {
           scheduledDate: { lt: new Date() },
           status: { in: ['SCHEDULED', 'CONFIRMED'] },
         },
       }),
       // Revenue from AMC
-      prisma.amcPayment.aggregate({
+      prisma.amcPaymentSchedule.aggregate({
         where: {
           paidAt: { gte: fromDate, lte: toDate },
           status: 'PAID',
@@ -342,13 +342,13 @@ export class ReportService {
     return {
       period: { from: fromDate, to: toDate },
       contracts: {
-        byStatus: contractsByStatus.map((c) => ({
+        byStatus: contractsByStatus.map((c: { status: string; _count: number; _sum: { contractValue: { toNumber: () => number } | null } }) => ({
           status: c.status,
           count: c._count,
-          value: c._sum.totalAmount?.toNumber() || 0,
+          value: c._sum.contractValue?.toNumber() || 0,
         })),
-        total: contractsByStatus.reduce((acc, c) => acc + c._count, 0),
-        totalValue: contractsByStatus.reduce((acc, c) => acc + (c._sum.totalAmount?.toNumber() || 0), 0),
+        total: contractsByStatus.reduce((acc: number, c: { _count: number }) => acc + c._count, 0),
+        totalValue: contractsByStatus.reduce((acc: number, c: { _sum: { contractValue: { toNumber: () => number } | null } }) => acc + (c._sum.contractValue?.toNumber() || 0), 0),
       },
       visits: {
         upcoming: upcomingVisits,
@@ -442,7 +442,7 @@ export class ReportService {
       }),
       // Customers by type
       prisma.customer.groupBy({
-        by: ['type'],
+        by: ['customerType'],
         _count: true,
       }),
       // Top customers by request count
@@ -468,8 +468,8 @@ export class ReportService {
       period: { from: fromDate, to: toDate },
       newCustomers,
       activeCustomers: activeCustomers.length,
-      byType: customersByType.map((c) => ({
-        type: c.type,
+      byType: customersByType.map((c: { customerType: string; _count: number }) => ({
+        type: c.customerType,
         count: c._count,
       })),
       topCustomers: topCustomersByRequests,

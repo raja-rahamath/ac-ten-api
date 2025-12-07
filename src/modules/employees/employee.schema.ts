@@ -45,7 +45,9 @@ export const updateEmployeeSchema = z.object({
     sectionId: z.string().optional(),
     managerId: z.string().optional(),
     hasSystemAccess: z.boolean().optional(),
+    roleId: z.string().optional(),
     isActive: z.boolean().optional(),
+    zoneIds: z.array(z.string()).optional(),
   }),
 });
 
@@ -62,6 +64,8 @@ export const listEmployeesSchema = z.object({
     search: z.string().optional(),
     companyId: z.string().optional(),
     departmentId: z.string().optional(),
+    jobTitleId: z.string().optional(),
+    zoneId: z.string().optional(),
     isActive: z.string().transform(v => v === 'true').optional(),
   }),
 });

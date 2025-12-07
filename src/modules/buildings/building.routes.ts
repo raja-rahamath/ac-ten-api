@@ -18,14 +18,14 @@ router.use(authenticate);
 
 router.post(
   '/',
-  authorize('buildings:write'),
+  authorize('properties:write'),
   validate(createBuildingSchema),
   controller.create.bind(controller)
 );
 
 router.get(
   '/',
-  authorize('buildings:read'),
+  authorize('properties:read'),
   validate(listBuildingsSchema),
   controller.findAll.bind(controller)
 );
@@ -33,28 +33,28 @@ router.get(
 // Flattened properties list (buildings + units combined)
 router.get(
   '/properties',
-  authorize('buildings:read'),
+  authorize('properties:read'),
   validate(listPropertiesSchema),
   controller.findAllProperties.bind(controller)
 );
 
 router.get(
   '/:id',
-  authorize('buildings:read'),
+  authorize('properties:read'),
   validate(getBuildingSchema),
   controller.findById.bind(controller)
 );
 
 router.put(
   '/:id',
-  authorize('buildings:write'),
+  authorize('properties:write'),
   validate(updateBuildingSchema),
   controller.update.bind(controller)
 );
 
 router.delete(
   '/:id',
-  authorize('buildings:delete'),
+  authorize('properties:delete'),
   validate(getBuildingSchema),
   controller.delete.bind(controller)
 );
@@ -62,7 +62,7 @@ router.delete(
 // Bulk create units for a building
 router.post(
   '/:id/units/bulk',
-  authorize('units:write'),
+  authorize('properties:write'),
   validate(bulkCreateUnitsSchema),
   controller.bulkCreateUnits.bind(controller)
 );

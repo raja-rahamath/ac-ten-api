@@ -1,51 +1,51 @@
 import { Router } from 'express';
-import { UnitController } from './unit.controller.js';
+import { AreaController } from './area.controller.js';
 import { authenticate, authorize } from '../../middleware/authenticate.js';
 import { validate } from '../../middleware/validate.js';
 import {
-  createUnitSchema,
-  updateUnitSchema,
-  getUnitSchema,
-  listUnitsSchema,
-} from './unit.schema.js';
+  createAreaSchema,
+  updateAreaSchema,
+  getAreaSchema,
+  listAreasSchema,
+} from './area.schema.js';
 
 const router = Router();
-const controller = new UnitController();
+const controller = new AreaController();
 
 router.use(authenticate);
 
 router.post(
   '/',
-  authorize('properties:write'),
-  validate(createUnitSchema),
+  authorize('zones:write'),
+  validate(createAreaSchema),
   controller.create.bind(controller)
 );
 
 router.get(
   '/',
-  authorize('properties:read'),
-  validate(listUnitsSchema),
+  authorize('zones:read'),
+  validate(listAreasSchema),
   controller.findAll.bind(controller)
 );
 
 router.get(
   '/:id',
-  authorize('properties:read'),
-  validate(getUnitSchema),
+  authorize('zones:read'),
+  validate(getAreaSchema),
   controller.findById.bind(controller)
 );
 
 router.put(
   '/:id',
-  authorize('properties:write'),
-  validate(updateUnitSchema),
+  authorize('zones:write'),
+  validate(updateAreaSchema),
   controller.update.bind(controller)
 );
 
 router.delete(
   '/:id',
-  authorize('properties:delete'),
-  validate(getUnitSchema),
+  authorize('zones:delete'),
+  validate(getAreaSchema),
   controller.delete.bind(controller)
 );
 

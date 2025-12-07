@@ -2,11 +2,13 @@ import { z } from 'zod';
 
 export const createZoneSchema = z.object({
   body: z.object({
-    governorateId: z.string(),
     name: z.string().min(1),
     nameAr: z.string().optional(),
     code: z.string().optional(),
+    description: z.string().optional(),
     headId: z.string().optional(),
+    secondaryHeadId: z.string().optional(),
+    areaIds: z.array(z.string()).optional(),
   }),
 });
 
@@ -15,12 +17,14 @@ export const updateZoneSchema = z.object({
     id: z.string(),
   }),
   body: z.object({
-    governorateId: z.string().optional(),
     name: z.string().min(1).optional(),
     nameAr: z.string().optional(),
     code: z.string().optional(),
+    description: z.string().optional(),
     headId: z.string().optional(),
+    secondaryHeadId: z.string().optional(),
     isActive: z.boolean().optional(),
+    areaIds: z.array(z.string()).optional(),
   }),
 });
 
@@ -35,7 +39,6 @@ export const listZonesSchema = z.object({
     page: z.coerce.number().default(1),
     limit: z.coerce.number().default(20),
     search: z.string().optional(),
-    governorateId: z.string().optional(),
     isActive: z.string().transform(v => v === 'true').optional(),
   }),
 });

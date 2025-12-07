@@ -227,7 +227,7 @@ export class EmployeeService {
   }
 
   async findAll(query: ListEmployeesQuery) {
-    const { search, companyId, departmentId, isActive } = query;
+    const { search, companyId, departmentId, jobTitleId, zoneId, isActive } = query;
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -235,12 +235,41 @@ export class EmployeeService {
     const where: any = {};
 
     if (search) {
-      where.OR = [
-        { firstName: { contains: search, mode: 'insensitive' } },
-        { lastName: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-        { employeeNo: { contains: search, mode: 'insensitive' } },
-      ];
+      const searchParts = search.trim().split(/\s+/);
+
+      if (searchParts.length >= 2) {
+        // Full name search: "Maria Santos" -> firstName contains "Maria" AND lastName contains "Santos"
+        // Also support reverse order: "Santos Maria" -> firstName contains "Santos" AND lastName contains "Maria"
+        where.OR = [
+          // First word = firstName, remaining = lastName
+          {
+            AND: [
+              { firstName: { contains: searchParts[0], mode: 'insensitive' } },
+              { lastName: { contains: searchParts.slice(1).join(' '), mode: 'insensitive' } },
+            ],
+          },
+          // Reverse: last word = firstName, first parts = lastName
+          {
+            AND: [
+              { firstName: { contains: searchParts[searchParts.length - 1], mode: 'insensitive' } },
+              { lastName: { contains: searchParts.slice(0, -1).join(' '), mode: 'insensitive' } },
+            ],
+          },
+          // Still allow partial matches on each field
+          { firstName: { contains: search, mode: 'insensitive' } },
+          { lastName: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+          { employeeNo: { contains: search, mode: 'insensitive' } },
+        ];
+      } else {
+        // Single word search
+        where.OR = [
+          { firstName: { contains: search, mode: 'insensitive' } },
+          { lastName: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+          { employeeNo: { contains: search, mode: 'insensitive' } },
+        ];
+      }
     }
 
     if (companyId) {
@@ -249,6 +278,18 @@ export class EmployeeService {
 
     if (departmentId) {
       where.departmentId = departmentId;
+    }
+
+    if (jobTitleId) {
+      where.jobTitleId = jobTitleId;
+    }
+
+    if (zoneId) {
+      where.zones = {
+        some: {
+          zoneId: zoneId,
+        },
+      };
     }
 
     if (isActive !== undefined) {
@@ -300,12 +341,15 @@ export class EmployeeService {
       }
     }
 
+    // Extract zoneIds from input
+    const { zoneIds, ...employeeData } = input;
+
     const employee = await prisma.employee.update({
       where: { id },
       data: {
-        ...input,
-        dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : undefined,
-        hireDate: input.hireDate ? new Date(input.hireDate) : undefined,
+        ...employeeData,
+        dateOfBirth: employeeData.dateOfBirth ? new Date(employeeData.dateOfBirth) : undefined,
+        hireDate: employeeData.hireDate ? new Date(employeeData.hireDate) : undefined,
       },
       include: {
         jobTitle: true,
@@ -314,7 +358,42 @@ export class EmployeeService {
       },
     });
 
-    return employee;
+    // Update zone assignments if provided
+    if (zoneIds !== undefined) {
+      // Delete existing zone assignments
+      await prisma.employeeZone.deleteMany({
+        where: { employeeId: id },
+      });
+
+      // Create new zone assignments
+      if (zoneIds.length > 0) {
+        await prisma.employeeZone.createMany({
+          data: zoneIds.map((zoneId, index) => ({
+            employeeId: id,
+            zoneId: zoneId,
+            isPrimary: index === 0, // First zone is primary
+            isActive: true,
+          })),
+        });
+      }
+    }
+
+    // Refetch with zone assignments
+    const updatedEmployee = await prisma.employee.findUnique({
+      where: { id },
+      include: {
+        jobTitle: true,
+        company: true,
+        department: true,
+        zones: {
+          include: {
+            zone: true,
+          },
+        },
+      },
+    });
+
+    return updatedEmployee;
   }
 
   async delete(id: string) {

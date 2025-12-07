@@ -6,19 +6,19 @@ export class BlockService {
   async create(input: CreateBlockInput) {
     const existing = await prisma.block.findFirst({
       where: {
-        zoneId: input.zoneId,
+        areaId: input.areaId,
         blockNo: input.blockNo,
       },
     });
 
     if (existing) {
-      throw new ConflictError('Block with this number already exists in this zone');
+      throw new ConflictError('Block with this number already exists in this area');
     }
 
     const block = await prisma.block.create({
       data: input,
       include: {
-        zone: {
+        area: {
           include: {
             governorate: {
               include: {
@@ -45,7 +45,7 @@ export class BlockService {
     const block = await prisma.block.findUnique({
       where: { id },
       include: {
-        zone: {
+        area: {
           include: {
             governorate: {
               include: {
@@ -83,7 +83,7 @@ export class BlockService {
   }
 
   async findAll(query: ListBlocksQuery) {
-    const { search, zoneId, isActive } = query;
+    const { search, areaId, isActive } = query;
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -98,8 +98,8 @@ export class BlockService {
       ];
     }
 
-    if (zoneId) {
-      where.zoneId = zoneId;
+    if (areaId) {
+      where.areaId = areaId;
     }
 
     if (isActive !== undefined) {
@@ -112,7 +112,7 @@ export class BlockService {
         skip,
         take: limit,
         include: {
-          zone: {
+          area: {
             select: {
               id: true,
               name: true,
@@ -151,16 +151,16 @@ export class BlockService {
       throw new NotFoundError('Block not found');
     }
 
-    if (input.blockNo && input.zoneId) {
+    if (input.blockNo && input.areaId) {
       const duplicate = await prisma.block.findFirst({
         where: {
-          zoneId: input.zoneId,
+          areaId: input.areaId,
           blockNo: input.blockNo,
           NOT: { id },
         },
       });
       if (duplicate) {
-        throw new ConflictError('Block with this number already exists in this zone');
+        throw new ConflictError('Block with this number already exists in this area');
       }
     }
 
@@ -168,7 +168,7 @@ export class BlockService {
       where: { id },
       data: input,
       include: {
-        zone: true,
+        area: true,
       },
     });
 

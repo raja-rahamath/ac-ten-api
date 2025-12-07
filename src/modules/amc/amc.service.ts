@@ -798,14 +798,14 @@ export class AmcService {
           include: {
             building: {
               include: {
-                zone: true,
+                area: true,
               },
             },
           },
         },
         property: {
           include: {
-            zone: true,
+            areaRef: true,
           },
         },
         complaintType: true,
@@ -825,10 +825,21 @@ export class AmcService {
       throw new BadRequestError('Only scheduled or confirmed visits can be converted to service requests');
     }
 
-    // Get zone from unit or property
-    const zoneId = schedule.unit?.building?.zoneId || schedule.property?.zoneId;
+    // Get zone from area (via building or property)
+    const areaId = schedule.unit?.building?.area?.id || schedule.property?.areaRef?.id;
+    let zoneId: string | null = null;
+
+    if (areaId) {
+      // Look up zone via ZoneArea junction table
+      const zoneArea = await prisma.zoneArea.findFirst({
+        where: { areaId, isActive: true },
+        select: { zoneId: true },
+      });
+      zoneId = zoneArea?.zoneId || null;
+    }
+
     if (!zoneId) {
-      throw new BadRequestError('Cannot determine zone for this schedule. Please ensure the property/unit has a zone assigned.');
+      throw new BadRequestError('Cannot determine zone for this schedule. Please ensure the property/unit has a valid area with a zone assigned.');
     }
 
     // Generate service request number
@@ -848,7 +859,7 @@ export class AmcService {
         requestType: 'AMC',
         priority: input.priority || 'MEDIUM',
         status: 'NEW',
-        source: 'BACK_OFFICE',
+        source: 'PORTAL',
         title: `AMC Service: ${schedule.complaintType.name}`,
         description: `Scheduled AMC service visit for contract ${schedule.contract.contractNo}`,
         internalNotes: input.notes,
@@ -897,7 +908,7 @@ export class AmcService {
     const results = [];
     for (const schedule of schedules) {
       try {
-        const sr = await this.convertToServiceRequest(schedule.id, {}, userId);
+        const sr = await this.convertToServiceRequest(schedule.id, { priority: 'MEDIUM' }, userId);
         results.push({ scheduleId: schedule.id, success: true, serviceRequestId: sr.id });
       } catch (error: any) {
         results.push({ scheduleId: schedule.id, success: false, error: error.message });

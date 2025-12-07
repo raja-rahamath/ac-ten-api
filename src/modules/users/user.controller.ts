@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { UserService } from './user.service.js';
-import { CreateUserInput, UpdateUserInput, ListUsersQuery } from './user.schema.js';
+import { CreateUserInput, UpdateUserInput, ListUsersQuery, ChangePasswordInput } from './user.schema.js';
 
 const userService = new UserService();
 
@@ -56,6 +56,25 @@ export class UserController {
   async delete(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await userService.delete(req.params.id);
+      res.json({
+        success: true,
+        ...result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async changePassword(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user?.userId;
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          error: { code: 'UNAUTHORIZED', message: 'User not authenticated' },
+        });
+      }
+      const result = await userService.changePassword(userId, req.body as ChangePasswordInput);
       res.json({
         success: true,
         ...result,

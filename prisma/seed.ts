@@ -52,6 +52,30 @@ async function main() {
     createPermission('action-templates', 'read', 'View action templates'),
     createPermission('action-templates', 'write', 'Create/update action templates'),
     createPermission('action-templates', 'delete', 'Delete action templates'),
+    // Currencies
+    createPermission('currencies', 'read', 'View currencies'),
+    createPermission('currencies', 'write', 'Create/update currencies'),
+    createPermission('currencies', 'delete', 'Delete currencies'),
+    // Inventory Items
+    createPermission('inventory-items', 'read', 'View inventory items'),
+    createPermission('inventory-items', 'write', 'Create/update inventory items'),
+    createPermission('inventory-items', 'delete', 'Delete inventory items'),
+    // Zones
+    createPermission('zones', 'read', 'View zones'),
+    createPermission('zones', 'write', 'Create/update zones'),
+    createPermission('zones', 'delete', 'Delete zones'),
+    // Governorates
+    createPermission('governorates', 'read', 'View governorates'),
+    createPermission('governorates', 'write', 'Create/update governorates'),
+    createPermission('governorates', 'delete', 'Delete governorates'),
+    // Complaint Types (Service Categories)
+    createPermission('complaint-types', 'read', 'View complaint types'),
+    createPermission('complaint-types', 'write', 'Create/update complaint types'),
+    createPermission('complaint-types', 'delete', 'Delete complaint types'),
+    // Properties
+    createPermission('properties', 'read', 'View properties'),
+    createPermission('properties', 'write', 'Create/update properties'),
+    createPermission('properties', 'delete', 'Delete properties'),
   ]);
 
   console.log(`✅ Created ${permissions.length} permissions`);
@@ -142,6 +166,11 @@ async function main() {
     ['service_requests', 'read'], ['service_requests', 'write'], ['service_requests', 'assign'],
     ['employees', 'read'], ['employees', 'write'], ['invoices', 'read'], ['invoices', 'write'],
     ['reports', 'read'], ['reports', 'export'], ['settings', 'read'],
+    // Location and service type permissions needed for service requests
+    ['zones', 'read'], ['zones', 'write'],
+    ['governorates', 'read'], ['governorates', 'write'],
+    ['complaint-types', 'read'], ['complaint-types', 'write'],
+    ['properties', 'read'], ['properties', 'write'],
   ];
   for (const [resource, action] of managerPerms) {
     const perm = findPerm(resource, action);
@@ -166,6 +195,8 @@ async function main() {
   const technicianPerms = [
     ['service_requests', 'read'], ['service_requests', 'write'],
     ['customers', 'read'], ['invoices', 'read'],
+    // Read permissions for dropdowns in service request forms
+    ['zones', 'read'], ['governorates', 'read'], ['complaint-types', 'read'], ['properties', 'read'],
   ];
   for (const [resource, action] of technicianPerms) {
     const perm = findPerm(resource, action);
@@ -191,6 +222,8 @@ async function main() {
     ['customers', 'read'], ['customers', 'write'],
     ['service_requests', 'read'], ['service_requests', 'write'],
     ['invoices', 'read'],
+    // Read permissions for dropdowns in service request forms
+    ['zones', 'read'], ['governorates', 'read'], ['complaint-types', 'read'], ['properties', 'read'],
   ];
   for (const [resource, action] of receptionistPerms) {
     const perm = findPerm(resource, action);
@@ -922,6 +955,199 @@ async function main() {
 
   console.log(`✅ Created ${leaveTypes.length} leave types`);
 
+  // Create Currencies
+  const currencies = await Promise.all([
+    prisma.currency.upsert({
+      where: { code: 'BHD' },
+      update: {},
+      create: {
+        code: 'BHD',
+        name: 'Bahraini Dinar',
+        nameAr: 'دينار بحريني',
+        symbol: 'BD',
+        symbolPosition: 'before',
+        decimalPlaces: 3, // BHD has 3 decimal places
+        isDefault: true,
+      },
+    }),
+    prisma.currency.upsert({
+      where: { code: 'USD' },
+      update: {},
+      create: {
+        code: 'USD',
+        name: 'US Dollar',
+        nameAr: 'دولار أمريكي',
+        symbol: '$',
+        symbolPosition: 'before',
+        decimalPlaces: 2,
+        isDefault: false,
+      },
+    }),
+    prisma.currency.upsert({
+      where: { code: 'EUR' },
+      update: {},
+      create: {
+        code: 'EUR',
+        name: 'Euro',
+        nameAr: 'يورو',
+        symbol: '€',
+        symbolPosition: 'before',
+        decimalPlaces: 2,
+        isDefault: false,
+      },
+    }),
+    prisma.currency.upsert({
+      where: { code: 'GBP' },
+      update: {},
+      create: {
+        code: 'GBP',
+        name: 'British Pound',
+        nameAr: 'جنيه استرليني',
+        symbol: '£',
+        symbolPosition: 'before',
+        decimalPlaces: 2,
+        isDefault: false,
+      },
+    }),
+    prisma.currency.upsert({
+      where: { code: 'SAR' },
+      update: {},
+      create: {
+        code: 'SAR',
+        name: 'Saudi Riyal',
+        nameAr: 'ريال سعودي',
+        symbol: 'ر.س',
+        symbolPosition: 'after',
+        decimalPlaces: 2,
+        isDefault: false,
+      },
+    }),
+    prisma.currency.upsert({
+      where: { code: 'AED' },
+      update: {},
+      create: {
+        code: 'AED',
+        name: 'UAE Dirham',
+        nameAr: 'درهم إماراتي',
+        symbol: 'د.إ',
+        symbolPosition: 'after',
+        decimalPlaces: 2,
+        isDefault: false,
+      },
+    }),
+    prisma.currency.upsert({
+      where: { code: 'KWD' },
+      update: {},
+      create: {
+        code: 'KWD',
+        name: 'Kuwaiti Dinar',
+        nameAr: 'دينار كويتي',
+        symbol: 'د.ك',
+        symbolPosition: 'after',
+        decimalPlaces: 3, // KWD has 3 decimal places
+        isDefault: false,
+      },
+    }),
+    prisma.currency.upsert({
+      where: { code: 'OMR' },
+      update: {},
+      create: {
+        code: 'OMR',
+        name: 'Omani Rial',
+        nameAr: 'ريال عماني',
+        symbol: 'ر.ع',
+        symbolPosition: 'after',
+        decimalPlaces: 3, // OMR has 3 decimal places
+        isDefault: false,
+      },
+    }),
+    prisma.currency.upsert({
+      where: { code: 'QAR' },
+      update: {},
+      create: {
+        code: 'QAR',
+        name: 'Qatari Riyal',
+        nameAr: 'ريال قطري',
+        symbol: 'ر.ق',
+        symbolPosition: 'after',
+        decimalPlaces: 2,
+        isDefault: false,
+      },
+    }),
+  ]);
+
+  console.log(`✅ Created ${currencies.length} currencies`);
+
+  // Create Inventory Categories
+  const inventoryCategories = await Promise.all([
+    prisma.inventoryCategory.upsert({
+      where: { name: 'AC Parts' },
+      update: {},
+      create: {
+        name: 'AC Parts',
+        nameAr: 'قطع غيار المكيفات',
+      },
+    }),
+    prisma.inventoryCategory.upsert({
+      where: { name: 'Plumbing Parts' },
+      update: {},
+      create: {
+        name: 'Plumbing Parts',
+        nameAr: 'قطع غيار السباكة',
+      },
+    }),
+    prisma.inventoryCategory.upsert({
+      where: { name: 'Electrical Parts' },
+      update: {},
+      create: {
+        name: 'Electrical Parts',
+        nameAr: 'قطع غيار كهربائية',
+      },
+    }),
+    prisma.inventoryCategory.upsert({
+      where: { name: 'Cleaning Supplies' },
+      update: {},
+      create: {
+        name: 'Cleaning Supplies',
+        nameAr: 'مستلزمات التنظيف',
+      },
+    }),
+    prisma.inventoryCategory.upsert({
+      where: { name: 'Tools & Equipment' },
+      update: {},
+      create: {
+        name: 'Tools & Equipment',
+        nameAr: 'أدوات ومعدات',
+      },
+    }),
+    prisma.inventoryCategory.upsert({
+      where: { name: 'Safety Equipment' },
+      update: {},
+      create: {
+        name: 'Safety Equipment',
+        nameAr: 'معدات السلامة',
+      },
+    }),
+    prisma.inventoryCategory.upsert({
+      where: { name: 'Consumables' },
+      update: {},
+      create: {
+        name: 'Consumables',
+        nameAr: 'مواد استهلاكية',
+      },
+    }),
+    prisma.inventoryCategory.upsert({
+      where: { name: 'Appliance Parts' },
+      update: {},
+      create: {
+        name: 'Appliance Parts',
+        nameAr: 'قطع غيار الأجهزة',
+      },
+    }),
+  ]);
+
+  console.log(`✅ Created ${inventoryCategories.length} inventory categories`);
+
   // Create Menu Items
   const menuItems = await Promise.all([
     prisma.menuItem.upsert({
@@ -1069,6 +1295,18 @@ async function main() {
       },
     }),
     prisma.menuItem.upsert({
+      where: { key: 'inventory' },
+      update: {},
+      create: {
+        key: 'inventory',
+        name: 'Inventory',
+        nameAr: 'المخزون',
+        icon: 'package',
+        href: '/inventory',
+        sortOrder: 13,
+      },
+    }),
+    prisma.menuItem.upsert({
       where: { key: 'settings' },
       update: {},
       create: {
@@ -1077,7 +1315,7 @@ async function main() {
         nameAr: 'الإعدادات',
         icon: 'settings',
         href: '/settings',
-        sortOrder: 13,
+        sortOrder: 14,
       },
     }),
   ]);

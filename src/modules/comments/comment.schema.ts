@@ -13,6 +13,7 @@ const commentTypeEnum = z.enum([
   'CUSTOMER_MESSAGE',
   'SITE_VISIT_NOTE',
   'SCHEDULING_NOTE',
+  'SCOPE_OF_WORK',
 ]);
 
 // Create Comment

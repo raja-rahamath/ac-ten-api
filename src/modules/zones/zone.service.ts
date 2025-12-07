@@ -4,16 +4,13 @@ import { CreateZoneInput, UpdateZoneInput, ListZonesQuery } from './zone.schema.
 
 export class ZoneService {
   async create(input: CreateZoneInput) {
-    // Check if zone with same name exists in the governorate
-    const existing = await prisma.zone.findFirst({
-      where: {
-        governorateId: input.governorateId,
-        name: input.name,
-      },
+    // Check if zone with same name exists (name is unique in Zone model)
+    const existing = await prisma.zone.findUnique({
+      where: { name: input.name },
     });
 
     if (existing) {
-      throw new ConflictError('Zone with this name already exists in this governorate');
+      throw new ConflictError('Zone with this name already exists');
     }
 
     // Check if code exists (if provided and code is unique)
@@ -26,27 +23,46 @@ export class ZoneService {
       }
     }
 
+    // Extract areaIds from input
+    const { areaIds, ...zoneData } = input;
+
     const zone = await prisma.zone.create({
-      data: input,
-      include: {
-        governorate: {
-          include: {
-            district: {
-              include: {
-                state: {
-                  include: {
-                    country: true,
-                  },
-                },
-              },
-            },
+      data: {
+        ...zoneData,
+        // Create area associations if areaIds provided
+        ...(areaIds && areaIds.length > 0 && {
+          areas: {
+            create: areaIds.map(areaId => ({
+              areaId,
+              isActive: true,
+            })),
           },
-        },
+        }),
+      },
+      include: {
         head: {
           select: {
             id: true,
             firstName: true,
             lastName: true,
+          },
+        },
+        secondaryHead: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        areas: {
+          include: {
+            area: {
+              select: {
+                id: true,
+                name: true,
+                nameAr: true,
+              },
+            },
           },
         },
       },
@@ -59,20 +75,16 @@ export class ZoneService {
     const zone = await prisma.zone.findUnique({
       where: { id },
       include: {
-        governorate: {
-          include: {
-            district: {
-              include: {
-                state: {
-                  include: {
-                    country: true,
-                  },
-                },
-              },
-            },
+        head: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
           },
         },
-        head: {
+        secondaryHead: {
           select: {
             id: true,
             firstName: true,
@@ -93,9 +105,20 @@ export class ZoneService {
             },
           },
         },
+        areas: {
+          include: {
+            area: {
+              select: {
+                id: true,
+                name: true,
+                nameAr: true,
+              },
+            },
+          },
+        },
         _count: {
           select: {
-            blocks: true,
+            areas: true,
             serviceRequests: true,
           },
         },
@@ -110,7 +133,7 @@ export class ZoneService {
   }
 
   async findAll(query: ListZonesQuery) {
-    const { search, governorateId, isActive } = query;
+    const { search, isActive } = query;
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -125,10 +148,6 @@ export class ZoneService {
       ];
     }
 
-    if (governorateId) {
-      where.governorateId = governorateId;
-    }
-
     if (isActive !== undefined) {
       where.isActive = isActive;
     }
@@ -139,13 +158,6 @@ export class ZoneService {
         skip,
         take: limit,
         include: {
-          governorate: {
-            select: {
-              id: true,
-              name: true,
-              nameAr: true,
-            },
-          },
           head: {
             select: {
               id: true,
@@ -153,14 +165,32 @@ export class ZoneService {
               lastName: true,
             },
           },
+          secondaryHead: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+          areas: {
+            include: {
+              area: {
+                select: {
+                  id: true,
+                  name: true,
+                  nameAr: true,
+                },
+              },
+            },
+          },
           _count: {
             select: {
-              blocks: true,
+              areas: true,
               employees: true,
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { name: 'asc' },
       }),
       prisma.zone.count({ where }),
     ]);
@@ -185,17 +215,13 @@ export class ZoneService {
       throw new NotFoundError('Zone not found');
     }
 
-    // Check name uniqueness in governorate if being updated
-    if (input.name && input.governorateId) {
-      const nameExists = await prisma.zone.findFirst({
-        where: {
-          governorateId: input.governorateId,
-          name: input.name,
-          NOT: { id },
-        },
+    // Check name uniqueness if being updated (name is unique in Zone model)
+    if (input.name && input.name !== existing.name) {
+      const nameExists = await prisma.zone.findUnique({
+        where: { name: input.name },
       });
       if (nameExists) {
-        throw new ConflictError('Zone with this name already exists in this governorate');
+        throw new ConflictError('Zone with this name already exists');
       }
     }
 
@@ -209,19 +235,67 @@ export class ZoneService {
       }
     }
 
-    const zone = await prisma.zone.update({
-      where: { id },
-      data: input,
-      include: {
-        governorate: true,
-        head: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
+    // Extract areaIds from input
+    const { areaIds, ...zoneData } = input;
+
+    // Use transaction to update zone and areas
+    const zone = await prisma.$transaction(async (tx) => {
+      // Update zone data
+      const updatedZone = await tx.zone.update({
+        where: { id },
+        data: zoneData,
+      });
+
+      // If areaIds is provided (including empty array), update area associations
+      if (areaIds !== undefined) {
+        // Delete existing area associations
+        await tx.zoneArea.deleteMany({
+          where: { zoneId: id },
+        });
+
+        // Create new area associations
+        if (areaIds.length > 0) {
+          await tx.zoneArea.createMany({
+            data: areaIds.map(areaId => ({
+              zoneId: id,
+              areaId,
+              isActive: true,
+            })),
+          });
+        }
+      }
+
+      // Return zone with includes
+      return tx.zone.findUnique({
+        where: { id },
+        include: {
+          head: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+          secondaryHead: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+          areas: {
+            include: {
+              area: {
+                select: {
+                  id: true,
+                  name: true,
+                  nameAr: true,
+                },
+              },
+            },
           },
         },
-      },
+      });
     });
 
     return zone;

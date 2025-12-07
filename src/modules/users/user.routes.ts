@@ -7,6 +7,7 @@ import {
   updateUserSchema,
   getUserSchema,
   listUsersSchema,
+  changePasswordSchema,
 } from './user.schema.js';
 
 const router = Router();
@@ -26,6 +27,14 @@ router.get(
   authorize('users:read'),
   validate(listUsersSchema),
   controller.findAll.bind(controller)
+);
+
+// Change password - any authenticated user can change their own password
+// Must be before /:id routes to avoid being matched as an ID
+router.post(
+  '/change-password',
+  validate(changePasswordSchema),
+  controller.changePassword.bind(controller)
 );
 
 router.get(

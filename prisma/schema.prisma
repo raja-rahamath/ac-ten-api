@@ -67,15 +67,17 @@ model User {
 }
 
 model Role {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  displayName String   @map("display_name")
-  description String?
-  isSystem    Boolean  @default(false) @map("is_system")
-  createdAt   DateTime @default(now()) @map("audit_create_date")
-  createdById String?  @map("audit_create_by")
-  updatedAt   DateTime @updatedAt @map("audit_change_date")
-  updatedById String?  @map("audit_change_by")
+  id               String   @id @default(cuid())
+  name             String   @unique
+  displayName      String   @map("display_name")
+  description      String?
+  isSystem         Boolean  @default(false) @map("is_system")
+  isActive         Boolean  @default(true) @map("is_active")
+  dashboardWidgets String[] @default([]) @map("dashboard_widgets") // List of widget keys to show on dashboard
+  createdAt        DateTime @default(now()) @map("audit_create_date")
+  createdById      String?  @map("audit_create_by")
+  updatedAt        DateTime @updatedAt @map("audit_change_date")
+  updatedById      String?  @map("audit_change_by")
 
   // Relations
   users       User[]
@@ -218,8 +220,9 @@ model Department {
   updatedById String?  @map("audit_change_by")
 
   // Relations
-  sections  Section[]
-  employees Employee[]
+  sections       Section[]
+  employees      Employee[]
+  complaintTypes ComplaintType[]
 
   @@map("departments")
   @@schema("fixitbh_ac")
@@ -350,6 +353,27 @@ model Country {
   @@schema("fixitbh_ac")
 }
 
+// ==================== CURRENCIES ====================
+
+model Currency {
+  id             String   @id @default(cuid())
+  code           String   @unique // ISO 4217 code: BHD, USD, EUR, etc.
+  name           String   @unique // Bahraini Dinar, US Dollar, etc.
+  nameAr         String?  @map("name_ar")
+  symbol         String // BD, $, €, etc.
+  symbolPosition String   @default("before") @map("symbol_position") // "before" or "after"
+  decimalPlaces  Int      @default(2) @map("decimal_places") // 3 for BHD, 2 for most others
+  isDefault      Boolean  @default(false) @map("is_default")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("audit_create_date")
+  createdById    String?  @map("audit_create_by")
+  updatedAt      DateTime @updatedAt @map("audit_change_date")
+  updatedById    String?  @map("audit_change_by")
+
+  @@map("currencies")
+  @@schema("fixitbh_ac")
+}
+
 model State {
   id          String   @id @default(cuid())
   countryId   String   @map("country_id")
@@ -406,45 +430,86 @@ model Governorate {
   updatedById String?  @map("audit_change_by")
 
   // Relations
-  zones Zone[]
+  areas Area[]
 
   @@unique([districtId, name])
   @@map("governorates")
   @@schema("fixitbh_ac")
 }
 
-model Zone {
-  id              String      @id @default(cuid())
-  governorateId   String      @map("governorate_id")
-  governorate     Governorate @relation(fields: [governorateId], references: [id], onDelete: Cascade)
-  name            String
-  nameAr          String?     @map("name_ar")
-  code            String?     @unique
-  headId          String?     @map("head_id")
-  head            Employee?   @relation("ZoneHead", fields: [headId], references: [id])
-  secondaryHeadId String?     @map("secondary_head_id")
-  secondaryHead   Employee?   @relation("ZoneSecondaryHead", fields: [secondaryHeadId], references: [id])
-  isActive        Boolean     @default(true) @map("is_active")
-  createdAt       DateTime    @default(now()) @map("audit_create_date")
-  createdById     String?     @map("audit_create_by")
-  updatedAt       DateTime    @updatedAt @map("audit_change_date")
-  updatedById     String?     @map("audit_change_by")
+// Area is a geographic unit under Governorate (Country -> State -> District -> Governorate -> Area)
+model Area {
+  id            String      @id @default(cuid())
+  governorateId String      @map("governorate_id")
+  governorate   Governorate @relation(fields: [governorateId], references: [id], onDelete: Cascade)
+  name          String
+  nameAr        String?     @map("name_ar")
+  code          String?     @unique
+  isActive      Boolean     @default(true) @map("is_active")
+  createdAt     DateTime    @default(now()) @map("audit_create_date")
+  createdById   String?     @map("audit_create_by")
+  updatedAt     DateTime    @updatedAt @map("audit_change_date")
+  updatedById   String?     @map("audit_change_by")
 
   // Relations
-  employees       EmployeeZone[]
-  blocks          Block[]
-  buildings       Building[]
-  serviceRequests ServiceRequest[]
+  blocks     Block[]
+  buildings  Building[]
+  properties Property[] @relation("PropertyArea")
+  zones      ZoneArea[] // Many-to-many with Zone (operational grouping)
 
   @@unique([governorateId, name])
+  @@map("areas")
+  @@schema("fixitbh_ac")
+}
+
+// Zone is an operational grouping that can include areas from different governorates
+// Zone A, Zone B, Zone C - each can have multiple areas from any governorate
+model Zone {
+  id              String    @id @default(cuid())
+  name            String    @unique
+  nameAr          String?   @map("name_ar")
+  code            String?   @unique
+  description     String?
+  headId          String?   @map("head_id")
+  head            Employee? @relation("ZoneHead", fields: [headId], references: [id])
+  secondaryHeadId String?   @map("secondary_head_id")
+  secondaryHead   Employee? @relation("ZoneSecondaryHead", fields: [secondaryHeadId], references: [id])
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("audit_create_date")
+  createdById     String?   @map("audit_create_by")
+  updatedAt       DateTime  @updatedAt @map("audit_change_date")
+  updatedById     String?   @map("audit_change_by")
+
+  // Relations
+  areas           ZoneArea[] // Many-to-many with Area
+  employees       EmployeeZone[]
+  serviceRequests ServiceRequest[]
+
   @@map("zones")
+  @@schema("fixitbh_ac")
+}
+
+// Junction table for Zone <-> Area many-to-many relationship
+model ZoneArea {
+  zoneId      String   @map("zone_id")
+  areaId      String   @map("area_id")
+  zone        Zone     @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  area        Area     @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("audit_create_date")
+  createdById String?  @map("audit_create_by")
+  updatedAt   DateTime @updatedAt @map("audit_change_date")
+  updatedById String?  @map("audit_change_by")
+
+  @@id([zoneId, areaId])
+  @@map("zone_areas")
   @@schema("fixitbh_ac")
 }
 
 model Block {
   id          String   @id @default(cuid())
-  zoneId      String   @map("zone_id")
-  zone        Zone     @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  areaId      String   @map("area_id")
+  area        Area     @relation(fields: [areaId], references: [id], onDelete: Cascade)
   blockNo     String   @map("block_no")
   name        String?
   nameAr      String?  @map("name_ar")
@@ -458,7 +523,7 @@ model Block {
   roads     Road[]
   buildings Building[]
 
-  @@unique([zoneId, blockNo])
+  @@unique([areaId, blockNo])
   @@map("blocks")
   @@schema("fixitbh_ac")
 }
@@ -658,8 +723,8 @@ model Building {
   block          Block?        @relation(fields: [blockId], references: [id])
   roadId         String?       @map("road_id")
   road           Road?         @relation(fields: [roadId], references: [id])
-  zoneId         String?       @map("zone_id")
-  zone           Zone?         @relation(fields: [zoneId], references: [id])
+  areaId         String?       @map("area_id")
+  area           Area?         @relation(fields: [areaId], references: [id])
   totalFloors    Int           @default(1) @map("total_floors")
   totalUnits     Int           @default(0) @map("total_units")
   yearBuilt      Int?          @map("year_built")
@@ -779,13 +844,14 @@ model Property {
   nameAr      String?      @map("name_ar")
   typeId      String       @map("type_id")
   type        PropertyType @relation(fields: [typeId], references: [id])
-  zoneId      String?      @map("zone_id")
+  areaId      String?      @map("area_id")
+  areaRef     Area?        @relation("PropertyArea", fields: [areaId], references: [id])
   address     String?
   addressAr   String?      @map("address_ar")
   building    String?
   floor       String?
   unit        String?
-  area        String?
+  areaName    String?      @map("area") // Legacy free-text area field
   landmark    String?
   latitude    Float?
   longitude   Float?
@@ -1287,17 +1353,19 @@ enum RequestSource {
 }
 
 model ComplaintType {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  nameAr      String?  @map("name_ar")
-  description String?
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("audit_create_date")
-  createdById String?  @map("audit_create_by")
-  updatedAt   DateTime @updatedAt @map("audit_change_date")
-  updatedById String?  @map("audit_change_by")
+  id           String   @id @default(cuid())
+  name         String   @unique
+  nameAr       String?  @map("name_ar")
+  description  String?
+  departmentId String?  @map("department_id")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("audit_create_date")
+  createdById  String?  @map("audit_create_by")
+  updatedAt    DateTime @updatedAt @map("audit_change_date")
+  updatedById  String?  @map("audit_change_by")
 
   // Relations
+  department          Department?          @relation(fields: [departmentId], references: [id])
   serviceRequests     ServiceRequest[]
   slaConfigs          SlaConfig[]
   amcContractServices AmcContractService[]
@@ -1388,6 +1456,7 @@ enum CommentType {
   CUSTOMER_MESSAGE // Message from customer portal
   SITE_VISIT_NOTE // Note from site visit
   SCHEDULING_NOTE // Note about scheduling preference
+  SCOPE_OF_WORK // Technician scope of work for estimation
 
   @@schema("fixitbh_ac")
 }
@@ -1464,6 +1533,34 @@ enum SiteVisitStatus {
   @@schema("fixitbh_ac")
 }
 
+// ==================== LABOR RATE TYPES (Master Rates) ====================
+
+model LaborRateType {
+  id          String  @id @default(cuid())
+  tenantId    String  @map("tenant_id")
+  code        String // e.g., "PAINTER", "ELECTRICIAN", "HELPER"
+  name        String // e.g., "Painter", "Electrician"
+  nameAr      String? @map("name_ar")
+  description String?
+  hourlyRate  Decimal @default(0) @map("hourly_rate") @db.Decimal(10, 3)
+  dailyRate   Decimal @default(0) @map("daily_rate") @db.Decimal(10, 3) // For day-based billing
+  isActive    Boolean @default(true) @map("is_active")
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  // Audit
+  createdAt   DateTime @default(now()) @map("audit_create_date")
+  createdById String?  @map("audit_create_by")
+  updatedAt   DateTime @updatedAt @map("audit_change_date")
+  updatedById String?  @map("audit_change_by")
+
+  // Relations
+  estimateLaborItems EstimateLaborItem[]
+
+  @@unique([tenantId, code])
+  @@map("labor_rate_types")
+  @@schema("fixitbh_ac")
+}
+
 // ==================== ESTIMATE (Internal Detailed Costing) ====================
 
 model Estimate {
@@ -1493,6 +1590,7 @@ model Estimate {
   materialCost  Decimal @default(0) @map("material_cost") @db.Decimal(10, 3)
   laborCost     Decimal @default(0) @map("labor_cost") @db.Decimal(10, 3)
   equipmentCost Decimal @default(0) @map("equipment_cost") @db.Decimal(10, 3)
+  transportCost Decimal @default(0) @map("transport_cost") @db.Decimal(10, 3)
   otherCost     Decimal @default(0) @map("other_cost") @db.Decimal(10, 3)
   subtotal      Decimal @default(0) @db.Decimal(10, 3)
 
@@ -1613,13 +1711,20 @@ model EstimateLaborItem {
   sortOrder Int               @default(0) @map("sort_order")
   laborType EstimateLaborType @default(TECHNICIAN) @map("labor_type")
 
+  // Reference to master rate (optional - allows override)
+  laborRateTypeId String?        @map("labor_rate_type_id")
+  laborRateType   LaborRateType? @relation(fields: [laborRateTypeId], references: [id])
+
   // Worker info
   description String // e.g., "Painter", "Helper", "Electrician"
 
   // Time & Rate
   quantity   Int     @default(1) // Number of workers
-  hours      Decimal @db.Decimal(10, 2) // Hours of work
-  hourlyRate Decimal @map("hourly_rate") @db.Decimal(10, 3)
+  rateType   String  @default("HOURLY") @map("rate_type") // "HOURLY" or "DAILY"
+  hours      Decimal @default(0) @db.Decimal(10, 2) // Hours of work (if HOURLY)
+  days       Decimal @default(0) @db.Decimal(10, 2) // Days of work (if DAILY)
+  hourlyRate Decimal @default(0) @map("hourly_rate") @db.Decimal(10, 3)
+  dailyRate  Decimal @default(0) @map("daily_rate") @db.Decimal(10, 3)
   totalCost  Decimal @map("total_cost") @db.Decimal(10, 3)
 
   // Markup for labor (optional)

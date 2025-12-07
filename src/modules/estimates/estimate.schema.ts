@@ -20,10 +20,14 @@ export const estimateItemSchema = z.object({
 export const estimateLaborItemSchema = z.object({
   sortOrder: z.number().optional(),
   laborType: z.enum(['TECHNICIAN', 'HELPER', 'SUPERVISOR', 'SPECIALIST', 'CONTRACTOR']).default('TECHNICIAN'),
+  laborRateTypeId: z.string().optional(), // Reference to master labor rate type
   description: z.string().min(1, 'Labor description is required'),
   quantity: z.number().int().positive('Number of workers must be positive'),
-  hours: z.number().positive('Hours must be positive'),
-  hourlyRate: z.number().min(0, 'Hourly rate must be non-negative'),
+  rateType: z.enum(['HOURLY', 'DAILY']).default('HOURLY'), // Calculate by hours or days
+  hours: z.number().min(0).default(0), // Hours of work (if HOURLY)
+  days: z.number().min(0).default(0), // Days of work (if DAILY)
+  hourlyRate: z.number().min(0, 'Hourly rate must be non-negative').default(0),
+  dailyRate: z.number().min(0, 'Daily rate must be non-negative').default(0),
   markupType: z.enum(['PERCENTAGE', 'FIXED']).optional(),
   markupValue: z.number().min(0).default(0),
   notes: z.string().optional(),
@@ -36,6 +40,9 @@ export const createEstimateSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
   scope: z.string().optional(),
+
+  // Transport cost
+  transportCost: z.number().min(0).default(0),
 
   // Profit margin
   profitMarginType: z.enum(['PERCENTAGE', 'FIXED']).optional(),

@@ -379,6 +379,54 @@ router.post('/:id/cancel', authenticate, estimateController.cancel.bind(estimate
 
 /**
  * @swagger
+ * /estimates/{id}/create-revision:
+ *   post:
+ *     summary: Create a new revision from rejected/revision-requested estimate
+ *     tags: [Estimates]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the rejected or revision-requested estimate
+ *     responses:
+ *       201:
+ *         description: New revision created
+ *       400:
+ *         description: Only rejected or revision-requested estimates can be revised
+ *       404:
+ *         description: Estimate not found
+ */
+router.post('/:id/create-revision', authenticate, estimateController.createRevision.bind(estimateController));
+
+/**
+ * @swagger
+ * /estimates/{id}/versions:
+ *   get:
+ *     summary: Get version history for an estimate
+ *     tags: [Estimates]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of any estimate in the version chain
+ *     responses:
+ *       200:
+ *         description: List of all versions of this estimate
+ *       404:
+ *         description: Estimate not found
+ */
+router.get('/:id/versions', authenticate, estimateController.getVersionHistory.bind(estimateController));
+
+/**
+ * @swagger
  * /estimates/{id}:
  *   delete:
  *     summary: Delete estimate (only drafts)

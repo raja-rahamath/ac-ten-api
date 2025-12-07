@@ -276,4 +276,41 @@ export class EstimateController {
       next(error);
     }
   }
+
+  // Create revision from rejected/revision-requested estimate
+  async createRevision(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const userId = (req as any).user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'User not authenticated' });
+      }
+
+      const estimate = await estimateService.createRevision(id, userId);
+      return res.status(201).json(estimate);
+    } catch (error: any) {
+      if (error.message === 'Estimate not found') {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message.includes('Only rejected') || error.message.includes('revision-requested')) {
+        return res.status(400).json({ error: error.message });
+      }
+      next(error);
+    }
+  }
+
+  // Get version history for an estimate
+  async getVersionHistory(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const history = await estimateService.getVersionHistory(id);
+      return res.json(history);
+    } catch (error: any) {
+      if (error.message === 'Estimate not found') {
+        return res.status(404).json({ error: error.message });
+      }
+      next(error);
+    }
+  }
 }

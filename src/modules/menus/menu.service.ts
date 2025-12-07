@@ -307,4 +307,23 @@ export class MenuService {
       isPrimary: za.isPrimary,
     }));
   }
+
+  // ==================== User Dashboard Widgets ====================
+
+  async getUserDashboardWidgets(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        role: true,
+      },
+    });
+
+    if (!user || !user.role) {
+      return [];
+    }
+
+    // If no dashboard widgets configured, return empty (will show all for admin or none for others)
+    // If role has dashboardWidgets set, return those
+    return user.role.dashboardWidgets || [];
+  }
 }

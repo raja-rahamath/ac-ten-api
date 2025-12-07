@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../../config/database.js';
-import { NotFoundError, ConflictError } from '../../utils/errors.js';
-import { CreateUserInput, UpdateUserInput, ListUsersQuery } from './user.schema.js';
+import { NotFoundError, ConflictError, UnauthorizedError } from '../../utils/errors.js';
+import { CreateUserInput, UpdateUserInput, ListUsersQuery, ChangePasswordInput } from './user.schema.js';
 
 export class UserService {
   async create(input: CreateUserInput) {
@@ -200,5 +200,32 @@ export class UserService {
     });
 
     return { message: 'User deleted successfully' };
+  }
+
+  async changePassword(userId: string, input: ChangePasswordInput) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    // Verify current password
+    const isValidPassword = await bcrypt.compare(input.currentPassword, user.password);
+    if (!isValidPassword) {
+      throw new UnauthorizedError('Current password is incorrect');
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(input.newPassword, 12);
+
+    // Update password
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
+
+    return { message: 'Password changed successfully' };
   }
 }

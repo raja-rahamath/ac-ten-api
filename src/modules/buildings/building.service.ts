@@ -20,7 +20,7 @@ export class BuildingService {
         name: input.name || null,
         nameAr: input.nameAr,
         typeId: input.typeId || null,
-        zoneId: input.zoneId || null,
+        areaId: input.areaId || null,
         totalFloors: input.totalFloors || 1,
         totalUnits: input.totalUnits || 0,
         yearBuilt: input.yearBuilt,
@@ -35,7 +35,7 @@ export class BuildingService {
       },
       include: {
         type: true,
-        zone: {
+        area: {
           include: {
             governorate: {
               include: {
@@ -63,7 +63,7 @@ export class BuildingService {
       where: { id },
       include: {
         type: true,
-        zone: {
+        area: {
           include: {
             governorate: {
               include: {
@@ -110,7 +110,7 @@ export class BuildingService {
   }
 
   async findAll(query: ListBuildingsQuery) {
-    const { search, typeId, blockNumber, roadNumber, zoneId, isActive } = query;
+    const { search, typeId, blockNumber, roadNumber, areaId, isActive } = query;
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -140,8 +140,8 @@ export class BuildingService {
       where.roadNumber = roadNumber;
     }
 
-    if (zoneId) {
-      where.zoneId = zoneId;
+    if (areaId) {
+      where.areaId = areaId;
     }
 
     if (isActive !== undefined) {
@@ -161,7 +161,7 @@ export class BuildingService {
               nameAr: true,
             },
           },
-          zone: {
+          area: {
             select: {
               id: true,
               name: true,
@@ -204,7 +204,7 @@ export class BuildingService {
       data: input,
       include: {
         type: true,
-        zone: true,
+        area: true,
       },
     });
 
@@ -330,7 +330,7 @@ export class BuildingService {
     const buildings = await prisma.building.findMany({
       where: buildingWhere,
       include: {
-        zone: {
+        area: {
           select: { id: true, name: true, nameAr: true },
         },
         units: {
@@ -357,7 +357,7 @@ export class BuildingService {
       roadNumber: string;
       blockNumber: string;
       buildingName: string | null;
-      zoneName: string | undefined;
+      areaName: string | undefined;
       unitType: string;
       unitTypeAr: string | undefined;
       address: string;
@@ -375,7 +375,7 @@ export class BuildingService {
         roadNumber: bldg.roadNumber,
         blockNumber: bldg.blockNumber,
         buildingName: bldg.name,
-        zoneName: bldg.zone?.name,
+        areaName: bldg.area?.name,
         unitType: 'Compound Entrance',
         unitTypeAr: undefined,
         address: `Building ${bldg.buildingNumber}, Road ${bldg.roadNumber}, Block ${bldg.blockNumber}`,
@@ -398,7 +398,7 @@ export class BuildingService {
           roadNumber: bldg.roadNumber,
           blockNumber: bldg.blockNumber,
           buildingName: bldg.name,
-          zoneName: bldg.zone?.name,
+          areaName: bldg.area?.name,
           unitType: u.type?.name || 'Flat',
           unitTypeAr: u.type?.nameAr ?? undefined,
           address: `Building ${bldg.buildingNumber}, Road ${bldg.roadNumber}, Block ${bldg.blockNumber}`,

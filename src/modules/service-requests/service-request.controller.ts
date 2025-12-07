@@ -13,7 +13,8 @@ export class ServiceRequestController {
   async create(req: Request, res: Response, next: NextFunction) {
     try {
       const serviceRequest = await serviceRequestService.create(
-        req.body as CreateServiceRequestInput
+        req.body as CreateServiceRequestInput,
+        req.user?.id
       );
       res.status(201).json({
         success: true,

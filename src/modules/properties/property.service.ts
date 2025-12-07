@@ -19,13 +19,13 @@ export class PropertyService {
         name: propertyData.name,
         nameAr: propertyData.nameAr,
         typeId: propertyData.typeId,
-        zoneId: propertyData.zoneId,
+        areaId: propertyData.areaId,
         address: propertyData.address,
         addressAr: propertyData.addressAr,
         building: propertyData.building,
         floor: propertyData.floor,
         unit: propertyData.unit,
-        area: propertyData.area,
+        areaName: propertyData.area,
         landmark: propertyData.landmark,
         latitude: propertyData.latitude,
         longitude: propertyData.longitude,
@@ -75,7 +75,7 @@ export class PropertyService {
   }
 
   async findAll(query: ListPropertiesQuery) {
-    const { search, customerId, typeId, zoneId, isActive } = query;
+    const { search, customerId, typeId, areaId, isActive } = query;
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -96,8 +96,8 @@ export class PropertyService {
       where.typeId = typeId;
     }
 
-    if (zoneId) {
-      where.zoneId = zoneId;
+    if (areaId) {
+      where.areaId = areaId;
     }
 
     if (isActive !== undefined) {
@@ -156,13 +156,13 @@ export class PropertyService {
         name: input.name,
         nameAr: input.nameAr,
         typeId: input.typeId,
-        zoneId: input.zoneId,
+        areaId: input.areaId,
         address: input.address,
         addressAr: input.addressAr,
         building: input.building,
         floor: input.floor,
         unit: input.unit,
-        area: input.area,
+        areaName: input.area,
         landmark: input.landmark,
         latitude: input.latitude,
         longitude: input.longitude,
