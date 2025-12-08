@@ -226,6 +226,44 @@ export class EmployeeService {
     return employee;
   }
 
+  async findByUserId(userId: string) {
+    const employee = await prisma.employee.findFirst({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            role: true,
+          },
+        },
+        jobTitle: true,
+        company: true,
+        division: true,
+        department: true,
+        section: true,
+        manager: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        zoneAssignments: {
+          include: {
+            zone: true,
+          },
+        },
+      },
+    });
+
+    if (!employee) {
+      throw new NotFoundError('No employee record found for this user');
+    }
+
+    return employee;
+  }
+
   async findAll(query: ListEmployeesQuery) {
     const { search, companyId, departmentId, jobTitleId, zoneId, isActive } = query;
     const page = query.page ?? 1;
@@ -285,7 +323,7 @@ export class EmployeeService {
     }
 
     if (zoneId) {
-      where.zones = {
+      where.zoneAssignments = {
         some: {
           zoneId: zoneId,
         },
@@ -385,7 +423,7 @@ export class EmployeeService {
         jobTitle: true,
         company: true,
         department: true,
-        zones: {
+        zoneAssignments: {
           include: {
             zone: true,
           },

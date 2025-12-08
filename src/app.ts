@@ -37,6 +37,7 @@ import jobTitleRoutes from './modules/job-titles/job-title.routes.js';
 import propertyTypeRoutes from './modules/property-types/property-type.routes.js';
 import assetTypeRoutes from './modules/asset-types/asset-type.routes.js';
 import complaintTypeRoutes from './modules/complaint-types/complaint-type.routes.js';
+import requestTypeRoutes from './modules/request-types/request-type.routes.js';
 import inventoryCategoryRoutes from './modules/inventory-categories/inventory-category.routes.js';
 import userRoutes from './modules/users/user.routes.js';
 import roleRoutes from './modules/roles/role.routes.js';
@@ -67,6 +68,7 @@ import commentRoutes from './modules/comments/comment.routes.js';
 import laborRateTypeRoutes from './modules/labor-rate-types/labor-rate-type.routes.js';
 import currencyRoutes from './modules/currencies/currency.routes.js';
 import inventoryItemRoutes from './modules/inventory-items/inventory-item.routes.js';
+import customerPropertyRoutes from './modules/customer-properties/customer-property.routes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -163,6 +165,7 @@ export function createApp(): Express {
   apiRouter.use('/property-types', propertyTypeRoutes);
   apiRouter.use('/asset-types', assetTypeRoutes);
   apiRouter.use('/complaint-types', complaintTypeRoutes);
+  apiRouter.use('/request-types', requestTypeRoutes);
   apiRouter.use('/inventory-categories', inventoryCategoryRoutes);
   apiRouter.use('/users', userRoutes);
   apiRouter.use('/roles', roleRoutes);
@@ -193,6 +196,7 @@ export function createApp(): Express {
   apiRouter.use('/labor-rate-types', laborRateTypeRoutes);
   apiRouter.use('/currencies', currencyRoutes);
   apiRouter.use('/inventory-items', inventoryItemRoutes);
+  apiRouter.use('/customer-properties', customerPropertyRoutes);
 
   app.use(`/api/${config.apiVersion}`, apiRouter);
 

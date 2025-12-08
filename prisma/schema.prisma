@@ -898,25 +898,46 @@ model PropertyType {
 }
 
 model CustomerProperty {
-  customerId    String        @map("customer_id")
-  propertyId    String        @map("property_id")
-  customer      Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  property      Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  ownershipType OwnershipType @default(OWNER) @map("ownership_type")
-  isPrimary     Boolean       @default(false) @map("is_primary")
-  startDate     DateTime?     @map("start_date")
-  endDate       DateTime?     @map("end_date")
-  createdAt     DateTime      @default(now()) @map("audit_create_date")
-  createdById   String?       @map("audit_create_by")
+  id            String                 @id @default(cuid())
+  customerId    String                 @map("customer_id")
+  propertyId    String                 @map("property_id")
+  customer      Customer               @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  property      Property               @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  ownershipType OwnershipType          @default(TENANT) @map("ownership_type")
+  status        CustomerPropertyStatus @default(ACTIVE)
+  isPrimary     Boolean                @default(false) @map("is_primary")
+  startDate     DateTime?              @map("start_date")
+  endDate       DateTime?              @map("end_date")
+  notes         String?
+  createdAt     DateTime               @default(now()) @map("audit_create_date")
+  createdById   String?                @map("audit_create_by")
+  updatedAt     DateTime               @updatedAt @map("audit_change_date")
+  updatedById   String?                @map("audit_change_by")
 
-  @@id([customerId, propertyId])
+  // Service requests linked through this relationship
+  serviceRequests ServiceRequest[] @relation("CustomerPropertyRequests")
+
+  @@unique([customerId, propertyId, status]) // Only one active relationship per customer-property pair
+  @@index([customerId])
+  @@index([propertyId])
+  @@index([status])
   @@map("customer_properties")
+  @@schema("fixitbh_ac")
+}
+
+enum CustomerPropertyStatus {
+  ACTIVE
+  INACTIVE
+  TRANSFERRED
+
   @@schema("fixitbh_ac")
 }
 
 enum OwnershipType {
   OWNER
   TENANT
+  PROPERTY_MANAGER
+  AUTHORIZED_CONTACT
 
   @@schema("fixitbh_ac")
 }
@@ -1247,39 +1268,41 @@ enum AssetDocumentType {
 // ==================== SERVICE REQUEST ====================
 
 model ServiceRequest {
-  id              String        @id @default(cuid())
-  requestNo       String        @unique @map("request_no")
-  customerId      String        @map("customer_id")
-  customer        Customer      @relation(fields: [customerId], references: [id])
-  propertyId      String?       @map("property_id")
-  property        Property?     @relation(fields: [propertyId], references: [id])
-  unitId          String?       @map("unit_id")
-  unit            Unit?         @relation(fields: [unitId], references: [id])
-  assetId         String?       @map("asset_id")
-  asset           Asset?        @relation(fields: [assetId], references: [id])
-  zoneId          String        @map("zone_id")
-  zone            Zone          @relation(fields: [zoneId], references: [id])
-  complaintTypeId String        @map("complaint_type_id")
-  complaintType   ComplaintType @relation(fields: [complaintTypeId], references: [id])
-  requestType     RequestType   @default(ON_CALL) @map("request_type")
-  priority        Priority      @default(MEDIUM)
-  status          RequestStatus @default(NEW)
-  source          RequestSource @default(PORTAL)
-  title           String
-  description     String?
-  customerNotes   String?       @map("customer_notes")
-  internalNotes   String?       @map("internal_notes")
-  assignedToId    String?       @map("assigned_to_id")
-  assignedTo      Employee?     @relation("AssignedEmployee", fields: [assignedToId], references: [id])
-  slaStartAt      DateTime?     @map("sla_start_at")
-  slaDueAt        DateTime?     @map("sla_due_at")
-  startedAt       DateTime?     @map("started_at")
-  completedAt     DateTime?     @map("completed_at")
-  closedAt        DateTime?     @map("closed_at")
-  createdAt       DateTime      @default(now()) @map("audit_create_date")
-  createdById     String?       @map("audit_create_by")
-  updatedAt       DateTime      @updatedAt @map("audit_change_date")
-  updatedById     String?       @map("audit_change_by")
+  id                 String            @id @default(cuid())
+  requestNo          String            @unique @map("request_no")
+  customerId         String            @map("customer_id")
+  customer           Customer          @relation(fields: [customerId], references: [id])
+  propertyId         String?           @map("property_id")
+  property           Property?         @relation(fields: [propertyId], references: [id])
+  customerPropertyId String?           @map("customer_property_id")
+  customerProperty   CustomerProperty? @relation("CustomerPropertyRequests", fields: [customerPropertyId], references: [id])
+  unitId             String?           @map("unit_id")
+  unit               Unit?             @relation(fields: [unitId], references: [id])
+  assetId            String?           @map("asset_id")
+  asset              Asset?            @relation(fields: [assetId], references: [id])
+  zoneId             String            @map("zone_id")
+  zone               Zone              @relation(fields: [zoneId], references: [id])
+  complaintTypeId    String            @map("complaint_type_id")
+  complaintType      ComplaintType     @relation(fields: [complaintTypeId], references: [id])
+  requestType        RequestType       @default(ON_CALL) @map("request_type")
+  priority           Priority          @default(MEDIUM)
+  status             RequestStatus     @default(NEW)
+  source             RequestSource     @default(PORTAL)
+  title              String
+  description        String?
+  customerNotes      String?           @map("customer_notes")
+  internalNotes      String?           @map("internal_notes")
+  assignedToId       String?           @map("assigned_to_id")
+  assignedTo         Employee?         @relation("AssignedEmployee", fields: [assignedToId], references: [id])
+  slaStartAt         DateTime?         @map("sla_start_at")
+  slaDueAt           DateTime?         @map("sla_due_at")
+  startedAt          DateTime?         @map("started_at")
+  completedAt        DateTime?         @map("completed_at")
+  closedAt           DateTime?         @map("closed_at")
+  createdAt          DateTime          @default(now()) @map("audit_create_date")
+  createdById        String?           @map("audit_create_by")
+  updatedAt          DateTime          @updatedAt @map("audit_change_date")
+  updatedById        String?           @map("audit_change_by")
 
   // Relations
   timeline      RequestTimeline[]

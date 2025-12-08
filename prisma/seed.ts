@@ -1187,6 +1187,18 @@ async function main() {
       },
     }),
     prisma.menuItem.upsert({
+      where: { key: 'customer-properties' },
+      update: {},
+      create: {
+        key: 'customer-properties',
+        name: 'Customer Properties',
+        nameAr: 'عقارات العملاء',
+        icon: 'properties',
+        href: '/customer-properties',
+        sortOrder: 4,
+      },
+    }),
+    prisma.menuItem.upsert({
       where: { key: 'properties' },
       update: {},
       create: {
@@ -1342,7 +1354,7 @@ async function main() {
   console.log('✅ Assigned all menus to admin role');
 
   // Assign menus to manager role (all except settings)
-  const managerMenuKeys = ['dashboard', 'requests', 'customers', 'properties', 'amc', 'employees', 'leaves', 'invoices', 'reports'];
+  const managerMenuKeys = ['dashboard', 'requests', 'customers', 'customer-properties', 'properties', 'amc', 'employees', 'leaves', 'invoices', 'reports'];
   for (const key of managerMenuKeys) {
     const menu = allMenuItems.find(m => m.key === key);
     if (menu) {
@@ -1386,7 +1398,7 @@ async function main() {
   console.log('✅ Assigned Service Requests menu to technician role (zone-specific access)');
 
   // Assign menus to receptionist role
-  const receptionistMenuKeys = ['dashboard', 'requests', 'customers', 'invoices'];
+  const receptionistMenuKeys = ['dashboard', 'requests', 'customers', 'customer-properties', 'invoices'];
   for (const key of receptionistMenuKeys) {
     const menu = allMenuItems.find(m => m.key === key);
     if (menu) {

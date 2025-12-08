@@ -8,7 +8,7 @@ export const createServiceRequestSchema = z.object({
     zoneId: z.string().optional(), // Will be derived from property if not provided
     complaintTypeId: z.string(),
     requestType: z.enum(['ON_CALL', 'CONTRACT', 'WARRANTY', 'EMERGENCY']).default('ON_CALL'),
-    priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'),
+    priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'EMERGENCY']).default('MEDIUM'),
     title: z.string().min(1),
     description: z.string().optional(),
     preferredDate: z.string().datetime().optional(),
@@ -22,7 +22,7 @@ export const updateServiceRequestSchema = z.object({
   }),
   body: z.object({
     status: z.enum(['NEW', 'ASSIGNED', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CANCELLED', 'CLOSED']).optional(),
-    priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
+    priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'EMERGENCY']).optional(),
     assignedEmployeeId: z.string().optional(),
     title: z.string().min(1).optional(),
     description: z.string().optional(),
@@ -54,7 +54,7 @@ export const listServiceRequestsSchema = z.object({
     limit: z.coerce.number().default(20),
     search: z.string().optional(),
     status: z.enum(['NEW', 'ASSIGNED', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CANCELLED', 'CLOSED']).optional(),
-    priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
+    priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'EMERGENCY']).optional(),
     customerId: z.string().optional(),
     assignedEmployeeId: z.string().optional(),
     zoneId: z.string().optional(),

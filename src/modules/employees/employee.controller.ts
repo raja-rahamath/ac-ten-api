@@ -29,6 +29,25 @@ export class EmployeeController {
     }
   }
 
+  async findMe(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          error: { message: 'User not authenticated' },
+        });
+      }
+      const employee = await employeeService.findByUserId(userId);
+      res.json({
+        success: true,
+        data: employee,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async findAll(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await employeeService.findAll(req.query as unknown as ListEmployeesQuery);

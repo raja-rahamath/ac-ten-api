@@ -52,6 +52,12 @@ router.post(
   controller.importExcel.bind(controller)
 );
 
+// Current user's employee record (no special permission needed - just authentication)
+router.get(
+  '/me',
+  controller.findMe.bind(controller)
+);
+
 // CRUD routes
 router.post(
   '/',
