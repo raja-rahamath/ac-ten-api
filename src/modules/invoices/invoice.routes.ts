@@ -35,6 +35,13 @@ router.get(
   controller.getStats.bind(controller)
 );
 
+// Generate invoice from completed service request
+router.post(
+  '/from-service-request/:serviceRequestId',
+  authorize('invoices:write'),
+  controller.createFromServiceRequest.bind(controller)
+);
+
 router.get(
   '/:id',
   authorize('invoices:read'),

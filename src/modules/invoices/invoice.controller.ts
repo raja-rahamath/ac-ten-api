@@ -97,4 +97,23 @@ export class InvoiceController {
       next(error);
     }
   }
+
+  async createFromServiceRequest(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { serviceRequestId } = req.params;
+      const { additionalItems, discountPercent } = req.body;
+      const invoice = await invoiceService.createFromServiceRequest(
+        serviceRequestId,
+        req.user!.id,
+        additionalItems,
+        discountPercent
+      );
+      res.status(201).json({
+        success: true,
+        data: invoice,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

@@ -5,6 +5,8 @@ import {
   CompleteSiteVisitInput,
   RescheduleSiteVisitInput,
   SiteVisitQueryInput,
+  AwaitingPartsInput,
+  AddMaterialInput,
 } from './site-visit.schema.js';
 
 const prisma = new PrismaClient();
@@ -463,6 +465,193 @@ export class SiteVisitService {
     }
 
     await prisma.siteVisit.delete({ where: { id } });
+  }
+
+  // Mark site visit as awaiting parts
+  async markAwaitingParts(id: string, data: AwaitingPartsInput, userId: string) {
+    const siteVisit = await prisma.siteVisit.findUnique({ where: { id } });
+
+    if (!siteVisit) {
+      throw new Error('Site visit not found');
+    }
+
+    if (siteVisit.status !== 'IN_PROGRESS') {
+      throw new Error('Only in-progress site visits can be marked as awaiting parts');
+    }
+
+    const updated = await prisma.siteVisit.update({
+      where: { id },
+      data: {
+        status: 'AWAITING_PARTS',
+        incompleteReason: data.incompleteReason,
+        partsNeeded: data.partsNeeded,
+        updatedById: userId,
+      },
+    });
+
+    // Update service request status
+    await prisma.serviceRequest.update({
+      where: { id: siteVisit.serviceRequestId },
+      data: { status: 'AWAITING_PARTS' },
+    });
+
+    // Create timeline entry
+    await prisma.requestTimeline.create({
+      data: {
+        serviceRequestId: siteVisit.serviceRequestId,
+        action: 'AWAITING_PARTS',
+        description: `Visit paused - awaiting parts: ${data.partsNeeded}. Reason: ${data.incompleteReason}`,
+        performedBy: userId,
+      },
+    });
+
+    return updated;
+  }
+
+  // Resume site visit (from awaiting parts)
+  async resume(id: string, userId: string, notes?: string) {
+    const siteVisit = await prisma.siteVisit.findUnique({ where: { id } });
+
+    if (!siteVisit) {
+      throw new Error('Site visit not found');
+    }
+
+    if (siteVisit.status !== 'AWAITING_PARTS') {
+      throw new Error('Only site visits awaiting parts can be resumed');
+    }
+
+    const updated = await prisma.siteVisit.update({
+      where: { id },
+      data: {
+        status: 'IN_PROGRESS',
+        updatedById: userId,
+      },
+    });
+
+    // Update service request status
+    await prisma.serviceRequest.update({
+      where: { id: siteVisit.serviceRequestId },
+      data: { status: 'IN_PROGRESS' },
+    });
+
+    // Create timeline entry
+    await prisma.requestTimeline.create({
+      data: {
+        serviceRequestId: siteVisit.serviceRequestId,
+        action: 'SITE_VISIT_RESUMED',
+        description: notes ? `Site visit resumed: ${notes}` : 'Site visit resumed after parts received',
+        performedBy: userId,
+      },
+    });
+
+    return updated;
+  }
+
+  // Add material usage to site visit
+  async addMaterial(siteVisitId: string, data: AddMaterialInput, userId: string) {
+    const siteVisit = await prisma.siteVisit.findUnique({ where: { id: siteVisitId } });
+
+    if (!siteVisit) {
+      throw new Error('Site visit not found');
+    }
+
+    // Validate item if from inventory
+    let itemName = data.itemName;
+    let unitPrice = data.unitPrice;
+
+    if (data.itemId) {
+      const item = await prisma.inventoryItem.findUnique({
+        where: { id: data.itemId },
+      });
+      if (!item) {
+        throw new Error('Inventory item not found');
+      }
+      itemName = item.name;
+      if (item.unitPrice) {
+        unitPrice = Number(item.unitPrice);
+      }
+    }
+
+    if (!itemName && !data.itemId) {
+      throw new Error('Either itemId or itemName must be provided');
+    }
+
+    const total = data.quantity * unitPrice;
+
+    const materialUsage = await prisma.materialUsage.create({
+      data: {
+        serviceRequestId: siteVisit.serviceRequestId,
+        siteVisitId,
+        itemId: data.itemId,
+        itemName: data.itemName,
+        itemDescription: data.itemDescription,
+        quantity: data.quantity,
+        unitPrice,
+        total,
+        usedBy: userId,
+        createdById: userId,
+      },
+      include: {
+        item: {
+          select: { id: true, name: true, itemNo: true },
+        },
+      },
+    });
+
+    // Create timeline entry
+    await prisma.requestTimeline.create({
+      data: {
+        serviceRequestId: siteVisit.serviceRequestId,
+        action: 'MATERIAL_USED',
+        description: `Material added: ${itemName || data.itemName} x${data.quantity}`,
+        performedBy: userId,
+      },
+    });
+
+    return materialUsage;
+  }
+
+  // Get materials for site visit
+  async getMaterials(siteVisitId: string) {
+    return prisma.materialUsage.findMany({
+      where: { siteVisitId },
+      include: {
+        item: {
+          select: { id: true, name: true, itemNo: true, unit: true },
+        },
+      },
+      orderBy: { usedAt: 'desc' },
+    });
+  }
+
+  // Remove material from site visit
+  async removeMaterial(materialId: string, userId: string) {
+    const material = await prisma.materialUsage.findUnique({
+      where: { id: materialId },
+      include: { siteVisit: true },
+    });
+
+    if (!material) {
+      throw new Error('Material usage not found');
+    }
+
+    if (material.siteVisit && ['COMPLETED', 'CANCELLED'].includes(material.siteVisit.status)) {
+      throw new Error('Cannot remove material from completed or cancelled visit');
+    }
+
+    await prisma.materialUsage.delete({ where: { id: materialId } });
+
+    // Create timeline entry
+    await prisma.requestTimeline.create({
+      data: {
+        serviceRequestId: material.serviceRequestId,
+        action: 'MATERIAL_REMOVED',
+        description: `Material removed: ${material.itemName || 'Inventory item'} x${material.quantity}`,
+        performedBy: userId,
+      },
+    });
+
+    return { success: true };
   }
 
   // Get site visits for a service request

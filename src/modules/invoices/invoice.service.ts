@@ -7,12 +7,64 @@ import {
   RecordPaymentInput,
 } from './invoice.schema.js';
 
-function generateInvoiceNo(): string {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `INV-${year}${month}-${random}`;
+// Get company settings (primary company)
+async function getCompanySettings() {
+  const company = await prisma.company.findFirst({
+    where: { isPrimary: true },
+  });
+
+  return {
+    vatRate: company?.vatRate ? Number(company.vatRate) / 100 : 0.10, // Default 10%
+    vatEnabled: company?.vatEnabled ?? true,
+    invoiceNoFormat: company?.invoiceNoFormat ?? 'INV-YYYY-NNNNN',
+    invoiceNoSequence: company?.invoiceNoSequence ?? 0,
+    receiptNoFormat: company?.receiptNoFormat ?? 'RCP-YYYY-NNNNN',
+    receiptNoSequence: company?.receiptNoSequence ?? 0,
+    paymentNoFormat: company?.paymentNoFormat ?? 'PAY-YYYY-NNNNN',
+    paymentNoSequence: company?.paymentNoSequence ?? 0,
+    maxDiscountPercent: company?.maxDiscountPercent ? Number(company.maxDiscountPercent) : 10,
+    companyId: company?.id,
+  };
+}
+
+// Generate document number from format pattern
+async function generateDocumentNo(type: 'invoice' | 'receipt' | 'payment'): Promise<string> {
+  const company = await prisma.company.findFirst({
+    where: { isPrimary: true },
+  });
+
+  if (!company) {
+    // Fallback to simple generation
+    const year = new Date().getFullYear();
+    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const prefix = type === 'invoice' ? 'INV' : type === 'receipt' ? 'RCP' : 'PAY';
+    return `${prefix}-${year}-${random}`;
+  }
+
+  const formatField = type === 'invoice' ? 'invoiceNoFormat' : type === 'receipt' ? 'receiptNoFormat' : 'paymentNoFormat';
+  const sequenceField = type === 'invoice' ? 'invoiceNoSequence' : type === 'receipt' ? 'receiptNoSequence' : 'paymentNoSequence';
+
+  const format = (company as any)[formatField] as string;
+  const currentSequence = (company as any)[sequenceField] as number;
+
+  const newSequence = currentSequence + 1;
+  const year = new Date().getFullYear().toString();
+
+  // Replace YYYY with year and NNNNN with padded sequence
+  let documentNo = format.replace('YYYY', year);
+  const match = documentNo.match(/N+/);
+  if (match) {
+    const padding = match[0].length;
+    documentNo = documentNo.replace(/N+/, newSequence.toString().padStart(padding, '0'));
+  }
+
+  // Update the sequence
+  await prisma.company.update({
+    where: { id: company.id },
+    data: { [sequenceField]: newSequence },
+  });
+
+  return documentNo;
 }
 
 function generatePaymentNo(): string {
@@ -23,6 +75,7 @@ function generatePaymentNo(): string {
 export class InvoiceService {
   async create(input: CreateInvoiceInput, userId: string) {
     const { items, ...invoiceData } = input;
+    const settings = await getCompanySettings();
 
     // Validate customer
     const customer = await prisma.customer.findUnique({
@@ -49,19 +102,21 @@ export class InvoiceService {
       }
     }
 
-    // Calculate totals
+    // Calculate totals with configurable VAT
     const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-    const taxRate = 0.05; // 5% VAT
-    const taxAmount = subtotal * taxRate;
+    const taxAmount = settings.vatEnabled ? subtotal * settings.vatRate : 0;
     const total = subtotal + taxAmount;
 
     if (!input.serviceRequestId) {
       throw new BadRequestError('Service request ID is required');
     }
 
+    // Generate invoice number from settings
+    const invoiceNo = await generateDocumentNo('invoice');
+
     const invoice = await prisma.invoice.create({
       data: {
-        invoiceNo: generateInvoiceNo(),
+        invoiceNo,
         customerId: invoiceData.customerId,
         serviceRequestId: input.serviceRequestId,
         dueDate: new Date(invoiceData.dueDate),
@@ -83,6 +138,167 @@ export class InvoiceService {
       include: {
         customer: true,
         items: true,
+      },
+    });
+
+    return invoice;
+  }
+
+  // Generate invoice from completed service request with all materials
+  async createFromServiceRequest(serviceRequestId: string, userId: string, additionalItems?: { description: string; quantity: number; unitPrice: number }[], discountPercent?: number) {
+    const settings = await getCompanySettings();
+
+    // Get service request with all related data
+    const serviceRequest = await prisma.serviceRequest.findUnique({
+      where: { id: serviceRequestId },
+      include: {
+        customer: true,
+        materialUsage: {
+          include: {
+            item: {
+              select: { name: true, itemNo: true },
+            },
+          },
+        },
+        siteVisits: {
+          where: { status: 'COMPLETED' },
+          include: {
+            materialUsage: {
+              include: {
+                item: {
+                  select: { name: true, itemNo: true },
+                },
+              },
+            },
+          },
+        },
+        complaintType: true,
+      },
+    });
+
+    if (!serviceRequest) {
+      throw new NotFoundError('Service request not found');
+    }
+
+    if (!['COMPLETED', 'SITE_VISIT_COMPLETED'].includes(serviceRequest.status)) {
+      throw new BadRequestError('Service request must be completed before generating invoice');
+    }
+
+    // Check if invoice already exists
+    const existingInvoice = await prisma.invoice.findUnique({
+      where: { serviceRequestId },
+    });
+    if (existingInvoice) {
+      throw new BadRequestError('Invoice already exists for this service request');
+    }
+
+    // Collect all material usage (from request and all completed site visits)
+    const allMaterials = [
+      ...serviceRequest.materialUsage,
+      ...serviceRequest.siteVisits.flatMap((sv: any) => sv.materialUsage || []),
+    ];
+
+    // Build invoice items
+    const invoiceItems: { description: string; quantity: number; unitPrice: number; total: number; itemType: string }[] = [];
+
+    // Add service charge based on complaint type
+    if (serviceRequest.complaintType) {
+      invoiceItems.push({
+        description: `Service: ${serviceRequest.complaintType.name}`,
+        quantity: 1,
+        unitPrice: 0, // This should come from pricing - will be populated from additional items
+        total: 0,
+        itemType: 'SERVICE',
+      });
+    }
+
+    // Add materials
+    for (const material of allMaterials) {
+      const itemName = material.item?.name || material.itemName || 'Material';
+      const itemNo = material.item?.itemNo || '';
+      invoiceItems.push({
+        description: itemNo ? `${itemName} (${itemNo})` : itemName,
+        quantity: material.quantity,
+        unitPrice: Number(material.unitPrice),
+        total: Number(material.total),
+        itemType: 'PART',
+      });
+    }
+
+    // Add additional items (service charges, etc.)
+    if (additionalItems) {
+      for (const item of additionalItems) {
+        invoiceItems.push({
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: item.quantity * item.unitPrice,
+          itemType: 'SERVICE',
+        });
+      }
+    }
+
+    // Calculate totals
+    const subtotal = invoiceItems.reduce((sum, item) => sum + item.total, 0);
+
+    // Apply discount if provided (validate max discount)
+    let discountAmount = 0;
+    if (discountPercent && discountPercent > 0) {
+      if (discountPercent > settings.maxDiscountPercent) {
+        throw new BadRequestError(`Discount cannot exceed ${settings.maxDiscountPercent}%`);
+      }
+      discountAmount = subtotal * (discountPercent / 100);
+    }
+
+    const subtotalAfterDiscount = subtotal - discountAmount;
+    const taxAmount = settings.vatEnabled ? subtotalAfterDiscount * settings.vatRate : 0;
+    const total = subtotalAfterDiscount + taxAmount;
+
+    // Generate invoice number
+    const invoiceNo = await generateDocumentNo('invoice');
+
+    // Create invoice with items
+    const invoice = await prisma.invoice.create({
+      data: {
+        invoiceNo,
+        customerId: serviceRequest.customerId,
+        serviceRequestId,
+        subtotal,
+        discountAmount,
+        taxAmount,
+        total,
+        status: 'DRAFT',
+        createdBy: userId,
+        items: {
+          create: invoiceItems.map((item) => ({
+            description: item.description,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            total: item.total,
+            itemType: item.itemType as any,
+          })),
+        },
+      },
+      include: {
+        customer: true,
+        items: true,
+        serviceRequest: true,
+      },
+    });
+
+    // Update service request status
+    await prisma.serviceRequest.update({
+      where: { id: serviceRequestId },
+      data: { status: 'INVOICED' },
+    });
+
+    // Create timeline entry
+    await prisma.requestTimeline.create({
+      data: {
+        serviceRequestId,
+        action: 'INVOICE_GENERATED',
+        description: `Invoice ${invoiceNo} generated for total ${total.toFixed(3)}`,
+        performedBy: userId,
       },
     });
 
@@ -181,13 +397,13 @@ export class InvoiceService {
     }
 
     const { items, ...updateData } = input;
+    const settings = await getCompanySettings();
 
     // If items are being updated, recalculate totals
     let totals: any = {};
     if (items && items.length > 0) {
       const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-      const taxRate = 0.05;
-      const taxAmount = subtotal * taxRate;
+      const taxAmount = settings.vatEnabled ? subtotal * settings.vatRate : 0;
       totals = {
         subtotal,
         taxAmount,
@@ -232,6 +448,8 @@ export class InvoiceService {
       where: { id },
       include: {
         payments: true,
+        customer: true,
+        serviceRequest: true,
       },
     });
 
@@ -251,10 +469,13 @@ export class InvoiceService {
       throw new BadRequestError(`Payment amount exceeds remaining balance of ${remaining}`);
     }
 
+    // Generate payment number
+    const paymentNo = await generateDocumentNo('payment');
+
     // Create payment record
     const payment = await prisma.payment.create({
       data: {
-        paymentNo: generatePaymentNo(),
+        paymentNo,
         invoiceId: id,
         amount: input.amount,
         paymentMethod: input.paymentMethod as any,
@@ -264,28 +485,69 @@ export class InvoiceService {
       },
     });
 
-    // Update invoice status if fully paid
+    // Update invoice status and paid amount
     const newTotalPaid = totalPaid + input.amount;
-    if (newTotalPaid >= invoice.total.toNumber()) {
-      await prisma.invoice.update({
-        where: { id },
-        data: {
-          status: 'PAID',
-          paidAt: new Date(),
-          paidAmount: newTotalPaid,
-        },
+    const isFullyPaid = newTotalPaid >= invoice.total.toNumber();
+
+    await prisma.invoice.update({
+      where: { id },
+      data: {
+        status: isFullyPaid ? 'PAID' : 'PARTIAL',
+        paidAt: isFullyPaid ? new Date() : null,
+        paidAmount: newTotalPaid,
+      },
+    });
+
+    // Generate receipt for this payment
+    const receiptNo = await generateDocumentNo('receipt');
+
+    const customer = invoice.customer;
+    const customerAddress = [
+      customer.addressLine1,
+      customer.addressLine2,
+      customer.city,
+      customer.state,
+    ].filter(Boolean).join(', ');
+
+    const receipt = await prisma.receipt.create({
+      data: {
+        receiptNo,
+        invoiceId: id,
+        paymentId: payment.id,
+        customerId: invoice.customerId,
+        customerName: `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customer.orgName || 'Customer',
+        customerEmail: customer.email,
+        customerPhone: customer.phone,
+        customerAddress,
+        amount: input.amount,
+        paymentMethod: input.paymentMethod as any,
+        paymentDate: new Date(),
+        paymentReference: input.reference,
+        invoiceTotal: invoice.total.toNumber(),
+        previouslyPaid: totalPaid,
+        balanceAfter: remaining - input.amount,
+        createdBy: userId,
+      },
+    });
+
+    // If service request exists, update its status and create timeline
+    if (invoice.serviceRequestId && isFullyPaid) {
+      await prisma.serviceRequest.update({
+        where: { id: invoice.serviceRequestId },
+        data: { status: 'PAID' },
       });
-    } else {
-      await prisma.invoice.update({
-        where: { id },
+
+      await prisma.requestTimeline.create({
         data: {
-          status: 'PARTIAL',
-          paidAmount: newTotalPaid,
+          serviceRequestId: invoice.serviceRequestId,
+          action: 'PAYMENT_RECEIVED',
+          description: `Payment of ${input.amount} received via ${input.paymentMethod}. Receipt: ${receiptNo}`,
+          performedBy: userId,
         },
       });
     }
 
-    return payment;
+    return { payment, receipt };
   }
 
   async delete(id: string) {

@@ -25,6 +25,9 @@ async function main() {
     // Company management
     createPermission('company', 'read', 'View company'),
     createPermission('company', 'write', 'Update company'),
+    createPermission('companies', 'read', 'View companies'),
+    createPermission('companies', 'write', 'Create/update companies'),
+    createPermission('companies', 'delete', 'Delete companies'),
     // Customer management
     createPermission('customers', 'read', 'View customers'),
     createPermission('customers', 'write', 'Create/update customers'),
@@ -162,7 +165,7 @@ async function main() {
 
   // Assign manager permissions
   const managerPerms = [
-    ['users', 'read'], ['company', 'read'], ['customers', 'read'], ['customers', 'write'],
+    ['users', 'read'], ['company', 'read'], ['companies', 'read'], ['customers', 'read'], ['customers', 'write'],
     ['service_requests', 'read'], ['service_requests', 'write'], ['service_requests', 'assign'],
     ['employees', 'read'], ['employees', 'write'], ['invoices', 'read'], ['invoices', 'write'],
     ['reports', 'read'], ['reports', 'export'], ['settings', 'read'],
@@ -195,8 +198,10 @@ async function main() {
   const technicianPerms = [
     ['service_requests', 'read'], ['service_requests', 'write'],
     ['customers', 'read'], ['invoices', 'read'],
+    ['companies', 'read'], // For displaying company name in header
     // Read permissions for dropdowns in service request forms
     ['zones', 'read'], ['governorates', 'read'], ['complaint-types', 'read'], ['properties', 'read'],
+    ['action-templates', 'read'], // For completing service requests
   ];
   for (const [resource, action] of technicianPerms) {
     const perm = findPerm(resource, action);
@@ -222,8 +227,10 @@ async function main() {
     ['customers', 'read'], ['customers', 'write'],
     ['service_requests', 'read'], ['service_requests', 'write'],
     ['invoices', 'read'],
+    ['companies', 'read'], // For displaying company name in header
     // Read permissions for dropdowns in service request forms
     ['zones', 'read'], ['governorates', 'read'], ['complaint-types', 'read'], ['properties', 'read'],
+    ['action-templates', 'read'], // For completing service requests
   ];
   for (const [resource, action] of receptionistPerms) {
     const perm = findPerm(resource, action);

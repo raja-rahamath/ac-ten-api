@@ -84,6 +84,26 @@ router.get('/service-request/:serviceRequestId', authenticate, siteVisitControll
 
 /**
  * @swagger
+ * /site-visits/materials/{materialId}:
+ *   delete:
+ *     summary: Remove material from site visit
+ *     tags: [Site Visits]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: materialId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       204:
+ *         description: Material removed
+ */
+router.delete('/materials/:materialId', authenticate, siteVisitController.removeMaterial.bind(siteVisitController));
+
+/**
+ * @swagger
  * /site-visits/{id}:
  *   get:
  *     summary: Get site visit by ID
@@ -330,5 +350,130 @@ router.post('/:id/cancel', authenticate, siteVisitController.cancel.bind(siteVis
  *         description: Site visit deleted
  */
 router.delete('/:id', authenticate, siteVisitController.delete.bind(siteVisitController));
+
+/**
+ * @swagger
+ * /site-visits/{id}/awaiting-parts:
+ *   post:
+ *     summary: Mark site visit as awaiting parts
+ *     tags: [Site Visits]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - incompleteReason
+ *               - partsNeeded
+ *             properties:
+ *               incompleteReason:
+ *                 type: string
+ *               partsNeeded:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Site visit marked as awaiting parts
+ */
+router.post('/:id/awaiting-parts', authenticate, siteVisitController.markAwaitingParts.bind(siteVisitController));
+
+/**
+ * @swagger
+ * /site-visits/{id}/resume:
+ *   post:
+ *     summary: Resume site visit (from awaiting parts)
+ *     tags: [Site Visits]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Site visit resumed
+ */
+router.post('/:id/resume', authenticate, siteVisitController.resume.bind(siteVisitController));
+
+/**
+ * @swagger
+ * /site-visits/{id}/materials:
+ *   post:
+ *     summary: Add material usage to site visit
+ *     tags: [Site Visits]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - quantity
+ *               - unitPrice
+ *             properties:
+ *               itemId:
+ *                 type: string
+ *                 description: ID of inventory item (if from inventory)
+ *               itemName:
+ *                 type: string
+ *                 description: Name of ad-hoc item (if not from inventory)
+ *               itemDescription:
+ *                 type: string
+ *               quantity:
+ *                 type: integer
+ *                 minimum: 1
+ *               unitPrice:
+ *                 type: number
+ *     responses:
+ *       201:
+ *         description: Material added
+ */
+router.post('/:id/materials', authenticate, siteVisitController.addMaterial.bind(siteVisitController));
+
+/**
+ * @swagger
+ * /site-visits/{id}/materials:
+ *   get:
+ *     summary: Get materials for site visit
+ *     tags: [Site Visits]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of materials used
+ */
+router.get('/:id/materials', authenticate, siteVisitController.getMaterials.bind(siteVisitController));
 
 export default router;

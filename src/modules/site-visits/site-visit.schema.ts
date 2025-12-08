@@ -42,6 +42,21 @@ export const rescheduleSiteVisitSchema = z.object({
   reason: z.string().min(1, 'Reschedule reason is required'),
 });
 
+// Mark as Awaiting Parts
+export const awaitingPartsSchema = z.object({
+  incompleteReason: z.string().min(1, 'Reason is required'),
+  partsNeeded: z.string().min(1, 'Parts needed description is required'),
+});
+
+// Add Material Usage
+export const addMaterialSchema = z.object({
+  itemId: z.string().optional(), // If from inventory
+  itemName: z.string().optional(), // If ad-hoc item
+  itemDescription: z.string().optional(),
+  quantity: z.number().int().positive().min(1),
+  unitPrice: z.number().positive(),
+});
+
 // Query params
 export const siteVisitQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -51,6 +66,7 @@ export const siteVisitQuerySchema = z.object({
     'SCHEDULED',
     'CONFIRMED',
     'IN_PROGRESS',
+    'AWAITING_PARTS',
     'COMPLETED',
     'CANCELLED',
     'NO_ACCESS',
@@ -70,4 +86,6 @@ export type UpdateSiteVisitInput = z.infer<typeof updateSiteVisitSchema>;
 export type StartSiteVisitInput = z.infer<typeof startSiteVisitSchema>;
 export type CompleteSiteVisitInput = z.infer<typeof completeSiteVisitSchema>;
 export type RescheduleSiteVisitInput = z.infer<typeof rescheduleSiteVisitSchema>;
+export type AwaitingPartsInput = z.infer<typeof awaitingPartsSchema>;
+export type AddMaterialInput = z.infer<typeof addMaterialSchema>;
 export type SiteVisitQueryInput = z.infer<typeof siteVisitQuerySchema>;

@@ -6,6 +6,8 @@ import {
   completeSiteVisitSchema,
   rescheduleSiteVisitSchema,
   siteVisitQuerySchema,
+  awaitingPartsSchema,
+  addMaterialSchema,
 } from './site-visit.schema.js';
 
 const siteVisitService = new SiteVisitService();
@@ -248,6 +250,118 @@ export class SiteVisitController {
       const stats = await siteVisitService.getStats();
       return res.json(stats);
     } catch (error) {
+      next(error);
+    }
+  }
+
+  // Mark site visit as awaiting parts
+  async markAwaitingParts(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const data = awaitingPartsSchema.parse(req.body);
+      const userId = (req as any).user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'User not authenticated' });
+      }
+
+      const siteVisit = await siteVisitService.markAwaitingParts(id, data, userId);
+      return res.json(siteVisit);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
+      if (error.message === 'Site visit not found') {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message.includes('Only in-progress')) {
+        return res.status(400).json({ error: error.message });
+      }
+      next(error);
+    }
+  }
+
+  // Resume site visit (from awaiting parts)
+  async resume(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const { notes } = req.body;
+      const userId = (req as any).user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'User not authenticated' });
+      }
+
+      const siteVisit = await siteVisitService.resume(id, userId, notes);
+      return res.json(siteVisit);
+    } catch (error: any) {
+      if (error.message === 'Site visit not found') {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message.includes('Only site visits awaiting parts')) {
+        return res.status(400).json({ error: error.message });
+      }
+      next(error);
+    }
+  }
+
+  // Add material to site visit
+  async addMaterial(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const data = addMaterialSchema.parse(req.body);
+      const userId = (req as any).user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'User not authenticated' });
+      }
+
+      const material = await siteVisitService.addMaterial(id, data, userId);
+      return res.status(201).json(material);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
+      if (error.message === 'Site visit not found' || error.message === 'Inventory item not found') {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message.includes('Either itemId or itemName')) {
+        return res.status(400).json({ error: error.message });
+      }
+      next(error);
+    }
+  }
+
+  // Get materials for site visit
+  async getMaterials(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const materials = await siteVisitService.getMaterials(id);
+      return res.json(materials);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Remove material from site visit
+  async removeMaterial(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { materialId } = req.params;
+      const userId = (req as any).user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'User not authenticated' });
+      }
+
+      await siteVisitService.removeMaterial(materialId, userId);
+      return res.status(204).send();
+    } catch (error: any) {
+      if (error.message === 'Material usage not found') {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message.includes('Cannot remove material')) {
+        return res.status(400).json({ error: error.message });
+      }
       next(error);
     }
   }

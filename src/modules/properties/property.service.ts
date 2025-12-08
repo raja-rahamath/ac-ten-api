@@ -195,12 +195,13 @@ export class PropertyService {
   }
 
   async linkToCustomer(propertyId: string, customerId: string, ownershipType: string = 'OWNER') {
-    // Check if link already exists
+    // Check if link already exists with ACTIVE status
     const existing = await prisma.customerProperty.findUnique({
       where: {
-        customerId_propertyId: {
+        customerId_propertyId_status: {
           customerId,
           propertyId,
+          status: 'ACTIVE',
         },
       },
     });

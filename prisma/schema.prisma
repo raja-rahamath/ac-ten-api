@@ -172,6 +172,31 @@ model Company {
   plusCode    String?  @map("plus_code")
   isActive    Boolean  @default(true) @map("is_active")
   isPrimary   Boolean  @default(false) @map("is_primary")
+
+  // Bank details for payments
+  bankName         String?  @map("bank_name")
+  bankAccountName  String?  @map("bank_account_name")
+  bankAccountNo    String?  @map("bank_account_no")
+  iban             String?
+  swiftCode        String?  @map("swift_code")
+  benefitPayQrCode String?  @map("benefit_pay_qr_code") // QR code image URL/base64
+
+  // Tax settings
+  vatRegistrationNo String?  @map("vat_registration_no")
+  vatRate           Decimal  @default(10) @map("vat_rate") @db.Decimal(5, 2) // Default 10%
+  vatEnabled        Boolean  @default(true) @map("vat_enabled")
+
+  // Document numbering formats (patterns: YYYY=year, NNNNN=sequence)
+  invoiceNoFormat   String  @default("INV-YYYY-NNNNN") @map("invoice_no_format")
+  invoiceNoSequence Int     @default(0) @map("invoice_no_sequence")
+  receiptNoFormat   String  @default("RCP-YYYY-NNNNN") @map("receipt_no_format")
+  receiptNoSequence Int     @default(0) @map("receipt_no_sequence")
+  paymentNoFormat   String  @default("PAY-YYYY-NNNNN") @map("payment_no_format")
+  paymentNoSequence Int     @default(0) @map("payment_no_sequence")
+
+  // Discount limits
+  maxDiscountPercent Decimal @default(10) @map("max_discount_percent") @db.Decimal(5, 2)
+
   createdAt   DateTime @default(now()) @map("audit_create_date")
   createdById String?  @map("audit_create_by")
   updatedAt   DateTime @updatedAt @map("audit_change_date")
@@ -1355,9 +1380,11 @@ enum RequestStatus {
   QUOTE_APPROVED
   SCHEDULED
   IN_PROGRESS
+  AWAITING_PARTS      // Waiting for parts to arrive
   ON_HOLD
   COMPLETED
   INVOICED
+  PAID                // Invoice paid in full
   CLOSED
   CANCELLED
 
@@ -1537,21 +1564,27 @@ model SiteVisit {
   updatedAt   DateTime @updatedAt @map("audit_change_date")
   updatedById String?  @map("audit_change_by")
 
+  // Reason for incomplete visit (if AWAITING_PARTS)
+  incompleteReason String? @map("incomplete_reason") @db.Text
+  partsNeeded      String? @map("parts_needed") @db.Text
+
   // Relations
-  estimates Estimate[]
+  estimates     Estimate[]
+  materialUsage MaterialUsage[]
 
   @@map("site_visits")
   @@schema("fixitbh_ac")
 }
 
 enum SiteVisitStatus {
-  SCHEDULED // Visit scheduled
-  CONFIRMED // Customer confirmed
-  IN_PROGRESS // Visit started
-  COMPLETED // Visit completed
-  CANCELLED // Visit cancelled
-  NO_ACCESS // Customer not available / no access
-  RESCHEDULED // Moved to different date
+  SCHEDULED       // Visit scheduled
+  CONFIRMED       // Customer confirmed
+  IN_PROGRESS     // Visit started
+  AWAITING_PARTS  // Visit paused, waiting for parts
+  COMPLETED       // Visit completed
+  CANCELLED       // Visit cancelled
+  NO_ACCESS       // Customer not available / no access
+  RESCHEDULED     // Moved to different date
 
   @@schema("fixitbh_ac")
 }
@@ -1999,11 +2032,18 @@ model MaterialUsage {
   id               String         @id @default(cuid())
   serviceRequestId String         @map("service_request_id")
   serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id])
-  itemId           String         @map("item_id")
-  item             InventoryItem  @relation(fields: [itemId], references: [id])
+  siteVisitId      String?        @map("site_visit_id")
+  siteVisit        SiteVisit?     @relation(fields: [siteVisitId], references: [id])
+  itemId           String?        @map("item_id")
+  item             InventoryItem? @relation(fields: [itemId], references: [id])
+
+  // For ad-hoc items not in inventory
+  itemName         String?        @map("item_name")
+  itemDescription  String?        @map("item_description")
+
   quantity         Int
-  unitPrice        Decimal        @map("unit_price") @db.Decimal(10, 2)
-  total            Decimal        @db.Decimal(10, 2)
+  unitPrice        Decimal        @map("unit_price") @db.Decimal(10, 3)
+  total            Decimal        @db.Decimal(10, 3)
   usedBy           String         @map("used_by")
   usedAt           DateTime       @default(now()) @map("used_at")
   createdAt        DateTime       @default(now()) @map("audit_create_date")
@@ -2129,6 +2169,7 @@ enum PaymentMethod {
   BANK_TRANSFER
   CHEQUE
   ONLINE
+  BENEFIT_PAY     // Bahrain Benefit App payment
 
   @@schema("fixitbh_ac")
 }
