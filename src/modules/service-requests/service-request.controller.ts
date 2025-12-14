@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ServiceRequestService } from './service-request.service.js';
+import { prisma } from '../../config/database.js';
+import { BadRequestError } from '../../utils/errors.js';
 import {
   CreateServiceRequestInput,
   UpdateServiceRequestInput,
@@ -9,11 +11,70 @@ import {
 
 const serviceRequestService = new ServiceRequestService();
 
+// Mapping from mobile category names to complaint type names in database
+const CATEGORY_TO_COMPLAINT_TYPE: Record<string, string> = {
+  'plumbing': 'Plumbing',
+  'electrical': 'Electrical',
+  'hvac': 'AC Maintenance',
+  'appliance': 'General Maintenance',
+  'cleaning': 'Cleaning',
+  'general': 'General Maintenance',
+};
+
 export class ServiceRequestController {
   async create(req: Request, res: Response, next: NextFunction) {
     try {
+      const body = req.body as CreateServiceRequestInput & { category?: string };
+
+      // For customer role, derive customerId from authenticated user if not provided
+      if (!body.customerId && req.user?.role === 'customer' && req.user.customerId) {
+        body.customerId = req.user.customerId;
+      }
+
+      // If customerId is still missing, return error
+      if (!body.customerId) {
+        throw new BadRequestError('Customer ID is required');
+      }
+
+      // If complaintTypeId is not provided but category is, look up the complaint type
+      if (!body.complaintTypeId && body.category) {
+        const categoryName = CATEGORY_TO_COMPLAINT_TYPE[body.category.toLowerCase()] || body.category;
+
+        // Look up complaint type by name (case-insensitive)
+        const complaintType = await prisma.complaintType.findFirst({
+          where: {
+            name: {
+              equals: categoryName,
+              mode: 'insensitive',
+            },
+          },
+        });
+
+        if (complaintType) {
+          body.complaintTypeId = complaintType.id;
+        } else {
+          // Fall back to first available complaint type
+          const defaultType = await prisma.complaintType.findFirst();
+          if (defaultType) {
+            body.complaintTypeId = defaultType.id;
+          } else {
+            throw new BadRequestError('No complaint types available. Please contact support.');
+          }
+        }
+      }
+
+      // If complaintTypeId is still missing, return error
+      if (!body.complaintTypeId) {
+        throw new BadRequestError('Complaint type or category is required');
+      }
+
+      // Normalize priority to uppercase if provided in lowercase
+      if (body.priority) {
+        body.priority = body.priority.toUpperCase() as any;
+      }
+
       const serviceRequest = await serviceRequestService.create(
-        req.body as CreateServiceRequestInput,
+        body as CreateServiceRequestInput,
         req.user?.id
       );
       res.status(201).json({
@@ -39,8 +100,23 @@ export class ServiceRequestController {
 
   async findAll(req: Request, res: Response, next: NextFunction) {
     try {
+      const userContext = req.user ? {
+        role: req.user.role,
+        departmentId: req.user.departmentId,
+      } : undefined;
+
+      // Build query with automatic customer filter for customer role
+      const query = req.query as unknown as ListServiceRequestsQuery;
+
+      // If user is a customer, automatically filter by their customerId
+      // This ensures customers can only see their own service requests
+      if (req.user?.role === 'customer' && req.user.customerId) {
+        query.customerId = req.user.customerId;
+      }
+
       const result = await serviceRequestService.findAll(
-        req.query as unknown as ListServiceRequestsQuery
+        query,
+        userContext
       );
       res.json({
         success: true,
@@ -97,7 +173,12 @@ export class ServiceRequestController {
 
   async getStats(req: Request, res: Response, next: NextFunction) {
     try {
-      const stats = await serviceRequestService.getStats();
+      const userContext = req.user ? {
+        role: req.user.role,
+        departmentId: req.user.departmentId,
+      } : undefined;
+
+      const stats = await serviceRequestService.getStats(userContext);
       res.json({
         success: true,
         data: stats,

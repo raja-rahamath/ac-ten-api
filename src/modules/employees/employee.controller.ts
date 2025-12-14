@@ -50,7 +50,15 @@ export class EmployeeController {
 
   async findAll(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await employeeService.findAll(req.query as unknown as ListEmployeesQuery);
+      const userContext = req.user ? {
+        role: req.user.role,
+        departmentId: req.user.departmentId,
+      } : undefined;
+
+      const result = await employeeService.findAll(
+        req.query as unknown as ListEmployeesQuery,
+        userContext
+      );
       res.json({
         success: true,
         ...result,

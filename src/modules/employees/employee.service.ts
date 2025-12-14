@@ -264,13 +264,18 @@ export class EmployeeService {
     return employee;
   }
 
-  async findAll(query: ListEmployeesQuery) {
+  async findAll(query: ListEmployeesQuery, userContext?: { role: string; departmentId?: string }) {
     const { search, companyId, departmentId, jobTitleId, zoneId, isActive } = query;
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
 
     const where: any = {};
+
+    // Department filter for managers - only show employees from their department
+    if (userContext?.role === 'manager' && userContext.departmentId) {
+      where.departmentId = userContext.departmentId;
+    }
 
     if (search) {
       const searchParts = search.trim().split(/\s+/);

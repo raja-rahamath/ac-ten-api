@@ -71,10 +71,10 @@ async function main() {
     createPermission('governorates', 'read', 'View governorates'),
     createPermission('governorates', 'write', 'Create/update governorates'),
     createPermission('governorates', 'delete', 'Delete governorates'),
-    // Complaint Types (Service Categories)
-    createPermission('complaint-types', 'read', 'View complaint types'),
-    createPermission('complaint-types', 'write', 'Create/update complaint types'),
-    createPermission('complaint-types', 'delete', 'Delete complaint types'),
+    // Service Types (stored as complaint_types in DB)
+    createPermission('complaint-types', 'read', 'View service types'),
+    createPermission('complaint-types', 'write', 'Create/update service types'),
+    createPermission('complaint-types', 'delete', 'Delete service types'),
     // Properties
     createPermission('properties', 'read', 'View properties'),
     createPermission('properties', 'write', 'Create/update properties'),
@@ -197,7 +197,7 @@ async function main() {
   // Assign technician permissions
   const technicianPerms = [
     ['service_requests', 'read'], ['service_requests', 'write'],
-    ['customers', 'read'], ['invoices', 'read'],
+    ['customers', 'read'], ['invoices', 'read'], ['invoices', 'write'], // Technicians can create invoices after completing work
     ['companies', 'read'], // For displaying company name in header
     // Read permissions for dropdowns in service request forms
     ['zones', 'read'], ['governorates', 'read'], ['complaint-types', 'read'], ['properties', 'read'],
@@ -226,7 +226,7 @@ async function main() {
   const receptionistPerms = [
     ['customers', 'read'], ['customers', 'write'],
     ['service_requests', 'read'], ['service_requests', 'write'],
-    ['invoices', 'read'],
+    ['invoices', 'read'], ['invoices', 'write'], // Receptionists handle billing
     ['companies', 'read'], // For displaying company name in header
     // Read permissions for dropdowns in service request forms
     ['zones', 'read'], ['governorates', 'read'], ['complaint-types', 'read'], ['properties', 'read'],
@@ -245,6 +245,33 @@ async function main() {
         update: {},
         create: {
           roleId: receptionistRole.id,
+          permissionId: perm.id,
+        },
+      });
+    }
+  }
+
+  // Assign customer permissions (for customer portal)
+  const customerPerms = [
+    ['service_requests', 'read'], ['service_requests', 'write'], // Customers can view and create their own requests
+    ['properties', 'read'], ['properties', 'write'], // Customers can manage their properties
+    ['invoices', 'read'], // Customers can view their invoices
+    // Read permissions for dropdowns in service request forms
+    ['zones', 'read'], ['governorates', 'read'], ['complaint-types', 'read'],
+  ];
+  for (const [resource, action] of customerPerms) {
+    const perm = findPerm(resource, action);
+    if (perm) {
+      await prisma.rolePermission.upsert({
+        where: {
+          roleId_permissionId: {
+            roleId: customerRole.id,
+            permissionId: perm.id,
+          },
+        },
+        update: {},
+        create: {
+          roleId: customerRole.id,
           permissionId: perm.id,
         },
       });

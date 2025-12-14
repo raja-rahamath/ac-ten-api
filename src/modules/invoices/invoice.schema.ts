@@ -42,6 +42,7 @@ export const listInvoicesSchema = z.object({
     search: z.string().optional(),
     status: z.enum(['DRAFT', 'SENT', 'PAID', 'PARTIAL', 'OVERDUE', 'CANCELLED']).optional(),
     customerId: z.string().optional(),
+    serviceRequestId: z.string().optional(),
     fromDate: z.string().optional(),
     toDate: z.string().optional(),
   }),

@@ -297,13 +297,20 @@ export class ServiceRequestService {
     return serviceRequest;
   }
 
-  async findAll(query: ListServiceRequestsQuery) {
+  async findAll(query: ListServiceRequestsQuery, userContext?: { role: string; departmentId?: string }) {
     const { search, status, priority, customerId, assignedEmployeeId, zoneId, zoneIds, complaintTypeId, dateFrom, dateTo } = query;
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
 
     const where: any = {};
+
+    // Department filter for managers - filter by complaint type's department
+    if (userContext?.role === 'manager' && userContext.departmentId) {
+      where.complaintType = {
+        departmentId: userContext.departmentId,
+      };
+    }
 
     if (search) {
       where.OR = [
@@ -535,15 +542,25 @@ export class ServiceRequestService {
     return { message: 'Service request cancelled successfully' };
   }
 
-  async getStats() {
+  async getStats(userContext?: { role: string; departmentId?: string }) {
+    // Build department filter for managers
+    const where: any = {};
+    if (userContext?.role === 'manager' && userContext.departmentId) {
+      where.complaintType = {
+        departmentId: userContext.departmentId,
+      };
+    }
+
     const [total, byStatus, byPriority] = await Promise.all([
-      prisma.serviceRequest.count(),
+      prisma.serviceRequest.count({ where }),
       prisma.serviceRequest.groupBy({
         by: ['status'],
+        where,
         _count: { status: true },
       }),
       prisma.serviceRequest.groupBy({
         by: ['priority'],
+        where,
         _count: { priority: true },
       }),
     ]);

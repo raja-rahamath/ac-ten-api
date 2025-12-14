@@ -12,23 +12,27 @@ datasource db {
 // ==================== USER & AUTH ====================
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  password     String
-  firstName    String    @map("first_name")
-  lastName     String    @map("last_name")
-  phone        String?
-  avatar       String?
-  isActive     Boolean   @default(true) @map("is_active")
-  isVerified   Boolean   @default(false) @map("is_verified")
-  isSystemUser Boolean   @default(false) @map("is_system_user") // Product admin users (not shown in user list)
-  lastLoginAt  DateTime? @map("last_login_at")
-  roleId       String?   @map("role_id")
-  role         Role?     @relation(fields: [roleId], references: [id])
-  createdAt    DateTime  @default(now()) @map("audit_create_date")
-  createdById  String?   @map("audit_create_by")
-  updatedAt    DateTime  @updatedAt @map("audit_change_date")
-  updatedById  String?   @map("audit_change_by")
+  id                       String    @id @default(cuid())
+  email                    String    @unique
+  password                 String
+  firstName                String    @map("first_name")
+  lastName                 String    @map("last_name")
+  phone                    String?
+  avatar                   String?
+  isActive                 Boolean   @default(true) @map("is_active")
+  isVerified               Boolean   @default(false) @map("is_verified")
+  isSystemUser             Boolean   @default(false) @map("is_system_user") // Product admin users (not shown in user list)
+  lastLoginAt              DateTime? @map("last_login_at")
+  verificationToken        String?   @map("verification_token")
+  verificationTokenExpiry  DateTime? @map("verification_token_expiry")
+  passwordResetToken       String?   @map("password_reset_token")
+  passwordResetTokenExpiry DateTime? @map("password_reset_token_expiry")
+  roleId                   String?   @map("role_id")
+  role                     Role?     @relation(fields: [roleId], references: [id])
+  createdAt                DateTime  @default(now()) @map("audit_create_date")
+  createdById              String?   @map("audit_create_by")
+  updatedAt                DateTime  @updatedAt @map("audit_change_date")
+  updatedById              String?   @map("audit_change_by")
 
   // Relations
   employee  Employee?
@@ -160,39 +164,39 @@ model RoleMenuPermission {
 // ==================== ORGANIZATION ====================
 
 model Company {
-  id          String   @id @default(cuid())
-  name        String
-  nameAr      String?  @map("name_ar")
-  logo        String?
-  email       String?
-  phone       String?
-  fax         String?
-  website     String?
-  address     String?
-  plusCode    String?  @map("plus_code")
-  isActive    Boolean  @default(true) @map("is_active")
-  isPrimary   Boolean  @default(false) @map("is_primary")
+  id        String  @id @default(cuid())
+  name      String
+  nameAr    String? @map("name_ar")
+  logo      String?
+  email     String?
+  phone     String?
+  fax       String?
+  website   String?
+  address   String?
+  plusCode  String? @map("plus_code")
+  isActive  Boolean @default(true) @map("is_active")
+  isPrimary Boolean @default(false) @map("is_primary")
 
   // Bank details for payments
-  bankName         String?  @map("bank_name")
-  bankAccountName  String?  @map("bank_account_name")
-  bankAccountNo    String?  @map("bank_account_no")
+  bankName         String? @map("bank_name")
+  bankAccountName  String? @map("bank_account_name")
+  bankAccountNo    String? @map("bank_account_no")
   iban             String?
-  swiftCode        String?  @map("swift_code")
-  benefitPayQrCode String?  @map("benefit_pay_qr_code") // QR code image URL/base64
+  swiftCode        String? @map("swift_code")
+  benefitPayQrCode String? @map("benefit_pay_qr_code") // QR code image URL/base64
 
   // Tax settings
-  vatRegistrationNo String?  @map("vat_registration_no")
-  vatRate           Decimal  @default(10) @map("vat_rate") @db.Decimal(5, 2) // Default 10%
-  vatEnabled        Boolean  @default(true) @map("vat_enabled")
+  vatRegistrationNo String? @map("vat_registration_no")
+  vatRate           Decimal @default(10) @map("vat_rate") @db.Decimal(5, 2) // Default 10%
+  vatEnabled        Boolean @default(true) @map("vat_enabled")
 
   // Document numbering formats (patterns: YYYY=year, NNNNN=sequence)
-  invoiceNoFormat   String  @default("INV-YYYY-NNNNN") @map("invoice_no_format")
-  invoiceNoSequence Int     @default(0) @map("invoice_no_sequence")
-  receiptNoFormat   String  @default("RCP-YYYY-NNNNN") @map("receipt_no_format")
-  receiptNoSequence Int     @default(0) @map("receipt_no_sequence")
-  paymentNoFormat   String  @default("PAY-YYYY-NNNNN") @map("payment_no_format")
-  paymentNoSequence Int     @default(0) @map("payment_no_sequence")
+  invoiceNoFormat   String @default("INV-YYYY-NNNNN") @map("invoice_no_format")
+  invoiceNoSequence Int    @default(0) @map("invoice_no_sequence")
+  receiptNoFormat   String @default("RCP-YYYY-NNNNN") @map("receipt_no_format")
+  receiptNoSequence Int    @default(0) @map("receipt_no_sequence")
+  paymentNoFormat   String @default("PAY-YYYY-NNNNN") @map("payment_no_format")
+  paymentNoSequence Int    @default(0) @map("payment_no_sequence")
 
   // Discount limits
   maxDiscountPercent Decimal @default(10) @map("max_discount_percent") @db.Decimal(5, 2)
@@ -469,6 +473,7 @@ model Area {
   governorate   Governorate @relation(fields: [governorateId], references: [id], onDelete: Cascade)
   name          String
   nameAr        String?     @map("name_ar")
+  aliases       String[]    @default([]) // Alternative spellings for fuzzy matching (e.g., ["Mahoos", "Mahuz"])
   code          String?     @unique
   isActive      Boolean     @default(true) @map("is_active")
   createdAt     DateTime    @default(now()) @map("audit_create_date")
@@ -1380,11 +1385,11 @@ enum RequestStatus {
   QUOTE_APPROVED
   SCHEDULED
   IN_PROGRESS
-  AWAITING_PARTS      // Waiting for parts to arrive
+  AWAITING_PARTS // Waiting for parts to arrive
   ON_HOLD
   COMPLETED
   INVOICED
-  PAID                // Invoice paid in full
+  PAID // Invoice paid in full
   CLOSED
   CANCELLED
 
@@ -1403,16 +1408,19 @@ enum RequestSource {
 }
 
 model ComplaintType {
-  id           String   @id @default(cuid())
-  name         String   @unique
-  nameAr       String?  @map("name_ar")
-  description  String?
-  departmentId String?  @map("department_id")
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("audit_create_date")
-  createdById  String?  @map("audit_create_by")
-  updatedAt    DateTime @updatedAt @map("audit_change_date")
-  updatedById  String?  @map("audit_change_by")
+  id                   String    @id @default(cuid())
+  code                 String?   @unique // e.g., AC_MAINT, PLUMB, ELEC
+  name                 String    @unique
+  nameAr               String?   @map("name_ar")
+  description          String?
+  departmentId         String?   @map("department_id")
+  defaultServiceCharge Decimal?  @map("default_service_charge") @db.Decimal(10, 3) // Default charge in BHD
+  priority             Priority? @default(MEDIUM) // Default priority for this service type
+  isActive             Boolean   @default(true) @map("is_active")
+  createdAt            DateTime  @default(now()) @map("audit_create_date")
+  createdById          String?   @map("audit_create_by")
+  updatedAt            DateTime  @updatedAt @map("audit_change_date")
+  updatedById          String?   @map("audit_change_by")
 
   // Relations
   department          Department?          @relation(fields: [departmentId], references: [id])
@@ -1577,14 +1585,14 @@ model SiteVisit {
 }
 
 enum SiteVisitStatus {
-  SCHEDULED       // Visit scheduled
-  CONFIRMED       // Customer confirmed
-  IN_PROGRESS     // Visit started
-  AWAITING_PARTS  // Visit paused, waiting for parts
-  COMPLETED       // Visit completed
-  CANCELLED       // Visit cancelled
-  NO_ACCESS       // Customer not available / no access
-  RESCHEDULED     // Moved to different date
+  SCHEDULED // Visit scheduled
+  CONFIRMED // Customer confirmed
+  IN_PROGRESS // Visit started
+  AWAITING_PARTS // Visit paused, waiting for parts
+  COMPLETED // Visit completed
+  CANCELLED // Visit cancelled
+  NO_ACCESS // Customer not available / no access
+  RESCHEDULED // Moved to different date
 
   @@schema("fixitbh_ac")
 }
@@ -2038,16 +2046,16 @@ model MaterialUsage {
   item             InventoryItem? @relation(fields: [itemId], references: [id])
 
   // For ad-hoc items not in inventory
-  itemName         String?        @map("item_name")
-  itemDescription  String?        @map("item_description")
+  itemName        String? @map("item_name")
+  itemDescription String? @map("item_description")
 
-  quantity         Int
-  unitPrice        Decimal        @map("unit_price") @db.Decimal(10, 3)
-  total            Decimal        @db.Decimal(10, 3)
-  usedBy           String         @map("used_by")
-  usedAt           DateTime       @default(now()) @map("used_at")
-  createdAt        DateTime       @default(now()) @map("audit_create_date")
-  createdById      String?        @map("audit_create_by")
+  quantity    Int
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(10, 3)
+  total       Decimal  @db.Decimal(10, 3)
+  usedBy      String   @map("used_by")
+  usedAt      DateTime @default(now()) @map("used_at")
+  createdAt   DateTime @default(now()) @map("audit_create_date")
+  createdById String?  @map("audit_create_by")
 
   @@map("material_usage")
   @@schema("fixitbh_ac")
@@ -2169,7 +2177,7 @@ enum PaymentMethod {
   BANK_TRANSFER
   CHEQUE
   ONLINE
-  BENEFIT_PAY     // Bahrain Benefit App payment
+  BENEFIT_PAY // Bahrain Benefit App payment
 
   @@schema("fixitbh_ac")
 }

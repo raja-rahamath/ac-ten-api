@@ -36,7 +36,15 @@ export class InvoiceController {
 
   async findAll(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await invoiceService.findAll(req.query as unknown as ListInvoicesQuery);
+      const userContext = req.user ? {
+        role: req.user.role,
+        departmentId: req.user.departmentId,
+      } : undefined;
+
+      const result = await invoiceService.findAll(
+        req.query as unknown as ListInvoicesQuery,
+        userContext
+      );
       res.json({
         success: true,
         ...result,
@@ -88,7 +96,12 @@ export class InvoiceController {
 
   async getStats(req: Request, res: Response, next: NextFunction) {
     try {
-      const stats = await invoiceService.getStats();
+      const userContext = req.user ? {
+        role: req.user.role,
+        departmentId: req.user.departmentId,
+      } : undefined;
+
+      const stats = await invoiceService.getStats(userContext);
       res.json({
         success: true,
         data: stats,

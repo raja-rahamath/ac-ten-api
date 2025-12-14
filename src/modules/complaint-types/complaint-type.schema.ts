@@ -2,9 +2,13 @@ import { z } from 'zod';
 
 export const createComplaintTypeSchema = z.object({
   body: z.object({
+    code: z.string().min(1, 'Code is required'),
     name: z.string().min(1, 'Name is required'),
     nameAr: z.string().optional(),
     description: z.string().optional(),
+    defaultServiceCharge: z.number().nullable().optional(),
+    priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
+    isActive: z.boolean().optional(),
   }),
 });
 
@@ -13,9 +17,12 @@ export const updateComplaintTypeSchema = z.object({
     id: z.string(),
   }),
   body: z.object({
+    code: z.string().min(1).optional(),
     name: z.string().min(1).optional(),
     nameAr: z.string().optional(),
     description: z.string().optional(),
+    defaultServiceCharge: z.number().nullable().optional(),
+    priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
     isActive: z.boolean().optional(),
   }),
 });

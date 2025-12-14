@@ -8,12 +8,68 @@ function generateCustomerNo(): string {
   return `CUS-${timestamp}${random}`;
 }
 
+// Convert name to title case with proper handling for special cases
+function toTitleCase(name: string | undefined | null): string | undefined {
+  if (!name) return undefined;
+
+  return name
+    .toLowerCase()
+    .split(/(\s+|-|')/) // Split on spaces, hyphens, and apostrophes (keep delimiters)
+    .map((part, index, arr) => {
+      // Skip empty strings and delimiters
+      if (!part || /^[\s\-']$/.test(part)) return part;
+
+      // Handle "Mc" prefix (e.g., McDonald)
+      if (part.length > 2 && part.startsWith('mc')) {
+        return 'Mc' + part.charAt(2).toUpperCase() + part.slice(3);
+      }
+
+      // Handle "Mac" prefix (e.g., MacArthur) - but not "Mack"
+      if (part.length > 3 && part.startsWith('mac') && !['mack', 'mace', 'mach'].includes(part)) {
+        return 'Mac' + part.charAt(3).toUpperCase() + part.slice(4);
+      }
+
+      // Handle "O'" prefix (e.g., O'Brien)
+      if (index > 0 && arr[index - 1] === "'" && arr[index - 2]?.toLowerCase() === 'o') {
+        return part.charAt(0).toUpperCase() + part.slice(1);
+      }
+
+      // Standard title case
+      return part.charAt(0).toUpperCase() + part.slice(1);
+    })
+    .join('');
+}
+
+// Normalize customer name fields to title case
+function normalizeCustomerNames<T extends { firstName?: string; lastName?: string; orgName?: string }>(input: T): T {
+  const result = { ...input };
+
+  if (result.firstName) {
+    (result as any).firstName = toTitleCase(result.firstName);
+  }
+  if (result.lastName) {
+    (result as any).lastName = toTitleCase(result.lastName);
+  }
+  if (result.orgName) {
+    // For organization names, just capitalize first letter of each word
+    (result as any).orgName = result.orgName
+      .split(/\s+/)
+      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  }
+
+  return result;
+}
+
 export class CustomerService {
   async create(input: CreateCustomerInput) {
+    // Normalize customer names to title case
+    const normalizedInput = normalizeCustomerNames(input);
+
     // Check if email exists (only if email is provided)
-    if (input.email) {
+    if (normalizedInput.email) {
       const existing = await prisma.customer.findUnique({
-        where: { email: input.email },
+        where: { email: normalizedInput.email },
       });
 
       if (existing) {
@@ -24,7 +80,7 @@ export class CustomerService {
     const customer = await prisma.customer.create({
       data: {
         customerNo: generateCustomerNo(),
-        ...input,
+        ...normalizedInput,
       },
     });
 
@@ -175,10 +231,13 @@ export class CustomerService {
       throw new NotFoundError('Customer not found');
     }
 
+    // Normalize customer names to title case
+    const normalizedInput = normalizeCustomerNames(input);
+
     // Check email uniqueness if being updated
-    if (input.email && input.email !== existing.email) {
+    if (normalizedInput.email && normalizedInput.email !== existing.email) {
       const emailExists = await prisma.customer.findUnique({
-        where: { email: input.email },
+        where: { email: normalizedInput.email },
       });
       if (emailExists) {
         throw new ConflictError('Email already in use');
@@ -187,7 +246,7 @@ export class CustomerService {
 
     const customer = await prisma.customer.update({
       where: { id },
-      data: input,
+      data: normalizedInput,
     });
 
     return customer;

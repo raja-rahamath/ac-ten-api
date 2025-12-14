@@ -2,13 +2,17 @@ import { z } from 'zod';
 
 export const createServiceRequestSchema = z.object({
   body: z.object({
-    customerId: z.string(),
+    customerId: z.string().optional(), // Optional for customer role - will be derived from authenticated user
     propertyId: z.string(),
     assetId: z.string().optional(),
     zoneId: z.string().optional(), // Will be derived from property if not provided
-    complaintTypeId: z.string(),
+    complaintTypeId: z.string().optional(), // Either complaintTypeId or category must be provided
+    category: z.string().optional(), // Category name (e.g., 'plumbing', 'electrical') - will be looked up
     requestType: z.enum(['ON_CALL', 'CONTRACT', 'WARRANTY', 'EMERGENCY']).default('ON_CALL'),
-    priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'EMERGENCY']).default('MEDIUM'),
+    // Accept both lowercase and uppercase priority values and transform to uppercase
+    priority: z.string().default('MEDIUM').transform((val) => val.toUpperCase()).pipe(
+      z.enum(['LOW', 'MEDIUM', 'HIGH', 'EMERGENCY'])
+    ),
     title: z.string().min(1),
     description: z.string().optional(),
     preferredDate: z.string().datetime().optional(),

@@ -20,6 +20,9 @@ declare global {
         email: string;
         role: string;
         permissions: string[];
+        employeeId?: string;
+        departmentId?: string;
+        customerId?: string;
       };
     }
   }
@@ -56,7 +59,7 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
       throw new UnauthorizedError('Invalid token type');
     }
 
-    // Get user with role and permissions
+    // Get user with role, permissions, employee, and customer info
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
       include: {
@@ -67,6 +70,17 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
                 permission: true,
               },
             },
+          },
+        },
+        employee: {
+          select: {
+            id: true,
+            departmentId: true,
+          },
+        },
+        customer: {
+          select: {
+            id: true,
           },
         },
       },
@@ -85,6 +99,9 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
       email: user.email,
       role: user.role?.name || 'user',
       permissions,
+      employeeId: user.employee?.id,
+      departmentId: user.employee?.departmentId || undefined,
+      customerId: user.customer?.id,
     };
 
     // Set the audit context for this request

@@ -124,6 +124,18 @@ export class AreaService {
               nameAr: true,
             },
           },
+          zones: {
+            select: {
+              zoneId: true,
+              zone: {
+                select: {
+                  id: true,
+                  name: true,
+                  code: true,
+                },
+              },
+            },
+          },
           _count: {
             select: {
               zones: true,
@@ -150,9 +162,11 @@ export class AreaService {
 
     const userMap = new Map(users.map(u => [u.id, `${u.firstName} ${u.lastName}`]));
 
-    // Enrich areas with user names
+    // Enrich areas with user names and flatten zones
     const enrichedAreas = areas.map(area => ({
       ...area,
+      zones: area.zones.map(z => z.zone),
+      zoneIds: area.zones.map(z => z.zoneId),
       createdByName: area.createdById ? userMap.get(area.createdById) || null : null,
       updatedByName: area.updatedById ? userMap.get(area.updatedById) || null : null,
     }));

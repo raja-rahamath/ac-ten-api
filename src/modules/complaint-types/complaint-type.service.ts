@@ -2,15 +2,80 @@ import { prisma } from '../../config/database.js';
 import { NotFoundError, ConflictError } from '../../utils/errors.js';
 import { CreateComplaintTypeInput, UpdateComplaintTypeInput, ListComplaintTypesQuery } from './complaint-type.schema.js';
 
+// Helper function to enrich complaint type with user names
+async function enrichWithUserNames(complaintType: any) {
+  const userIds = [complaintType.createdById, complaintType.updatedById].filter(Boolean);
+
+  if (userIds.length === 0) {
+    return {
+      ...complaintType,
+      createdByName: null,
+      updatedByName: null,
+    };
+  }
+
+  const users = await prisma.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, firstName: true, lastName: true },
+  });
+
+  const userMap = new Map(users.map(u => [u.id, `${u.firstName || ''} ${u.lastName || ''}`.trim() || null]));
+
+  return {
+    ...complaintType,
+    createdByName: complaintType.createdById ? userMap.get(complaintType.createdById) || null : null,
+    updatedByName: complaintType.updatedById ? userMap.get(complaintType.updatedById) || null : null,
+  };
+}
+
+// Helper function to enrich multiple complaint types with user names (batch lookup)
+async function enrichManyWithUserNames(complaintTypes: any[]) {
+  const userIds = new Set<string>();
+  complaintTypes.forEach(ct => {
+    if (ct.createdById) userIds.add(ct.createdById);
+    if (ct.updatedById) userIds.add(ct.updatedById);
+  });
+
+  if (userIds.size === 0) {
+    return complaintTypes.map(ct => ({
+      ...ct,
+      createdByName: null,
+      updatedByName: null,
+    }));
+  }
+
+  const users = await prisma.user.findMany({
+    where: { id: { in: Array.from(userIds) } },
+    select: { id: true, firstName: true, lastName: true },
+  });
+
+  const userMap = new Map(users.map(u => [u.id, `${u.firstName || ''} ${u.lastName || ''}`.trim() || null]));
+
+  return complaintTypes.map(ct => ({
+    ...ct,
+    createdByName: ct.createdById ? userMap.get(ct.createdById) || null : null,
+    updatedByName: ct.updatedById ? userMap.get(ct.updatedById) || null : null,
+  }));
+}
+
 export class ComplaintTypeService {
   async create(input: CreateComplaintTypeInput) {
-    // Check if complaint type with same name exists
-    const existing = await prisma.complaintType.findUnique({
+    // Check if complaint type with same name or code exists
+    const existingName = await prisma.complaintType.findUnique({
       where: { name: input.name },
     });
 
-    if (existing) {
-      throw new ConflictError('Complaint type with this name already exists');
+    if (existingName) {
+      throw new ConflictError('Service type with this name already exists');
+    }
+
+    if (input.code) {
+      const existingCode = await prisma.complaintType.findUnique({
+        where: { code: input.code },
+      });
+      if (existingCode) {
+        throw new ConflictError('Service type with this code already exists');
+      }
     }
 
     const complaintType = await prisma.complaintType.create({
@@ -45,7 +110,7 @@ export class ComplaintTypeService {
       throw new NotFoundError('Complaint type not found');
     }
 
-    return complaintType;
+    return enrichWithUserNames(complaintType);
   }
 
   async findAll(query: ListComplaintTypesQuery) {
@@ -86,8 +151,10 @@ export class ComplaintTypeService {
       prisma.complaintType.count({ where }),
     ]);
 
+    const enrichedData = await enrichManyWithUserNames(complaintTypes);
+
     return {
-      data: complaintTypes,
+      data: enrichedData,
       pagination: {
         page,
         limit,
@@ -112,7 +179,17 @@ export class ComplaintTypeService {
         where: { name: input.name },
       });
       if (nameExists) {
-        throw new ConflictError('Complaint type with this name already exists');
+        throw new ConflictError('Service type with this name already exists');
+      }
+    }
+
+    // Check code uniqueness if being updated
+    if (input.code && input.code !== existing.code) {
+      const codeExists = await prisma.complaintType.findUnique({
+        where: { code: input.code },
+      });
+      if (codeExists) {
+        throw new ConflictError('Service type with this code already exists');
       }
     }
 

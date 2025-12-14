@@ -184,9 +184,12 @@ export class InvoiceService {
       throw new BadRequestError('Service request must be completed before generating invoice');
     }
 
-    // Check if invoice already exists
-    const existingInvoice = await prisma.invoice.findUnique({
-      where: { serviceRequestId },
+    // Check if active invoice already exists (exclude cancelled invoices)
+    const existingInvoice = await prisma.invoice.findFirst({
+      where: {
+        serviceRequestId,
+        status: { not: 'CANCELLED' },
+      },
     });
     if (existingInvoice) {
       throw new BadRequestError('Invoice already exists for this service request');
@@ -203,11 +206,14 @@ export class InvoiceService {
 
     // Add service charge based on complaint type
     if (serviceRequest.complaintType) {
+      const serviceCharge = serviceRequest.complaintType.defaultServiceCharge
+        ? Number(serviceRequest.complaintType.defaultServiceCharge)
+        : 0;
       invoiceItems.push({
         description: `Service: ${serviceRequest.complaintType.name}`,
         quantity: 1,
-        unitPrice: 0, // This should come from pricing - will be populated from additional items
-        total: 0,
+        unitPrice: serviceCharge,
+        total: serviceCharge,
         itemType: 'SERVICE',
       });
     }
@@ -325,13 +331,27 @@ export class InvoiceService {
     return invoice;
   }
 
-  async findAll(query: ListInvoicesQuery) {
-    const { search, status, customerId, fromDate, toDate } = query;
+  async findAll(query: ListInvoicesQuery, userContext?: { role: string; departmentId?: string }) {
+    const { search, status, customerId, serviceRequestId, fromDate, toDate } = query;
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
 
     const where: any = {};
+
+    // Filter by service request ID if provided
+    if (serviceRequestId) {
+      where.serviceRequestId = serviceRequestId;
+    }
+
+    // Department filter for managers - filter by service request's complaint type department
+    if (userContext?.role === 'manager' && userContext.departmentId) {
+      where.serviceRequest = {
+        complaintType: {
+          departmentId: userContext.departmentId,
+        },
+      };
+    }
 
     if (search) {
       where.OR = [
@@ -571,16 +591,27 @@ export class InvoiceService {
     return { message: 'Invoice cancelled successfully' };
   }
 
-  async getStats() {
+  async getStats(userContext?: { role: string; departmentId?: string }) {
+    // Build department filter for managers
+    const where: any = {};
+    if (userContext?.role === 'manager' && userContext.departmentId) {
+      where.serviceRequest = {
+        complaintType: {
+          departmentId: userContext.departmentId,
+        },
+      };
+    }
+
     const [total, byStatus, revenue] = await Promise.all([
-      prisma.invoice.count(),
+      prisma.invoice.count({ where }),
       prisma.invoice.groupBy({
         by: ['status'],
+        where,
         _count: true,
         _sum: { total: true },
       }),
       prisma.invoice.aggregate({
-        where: { status: 'PAID' },
+        where: { ...where, status: 'PAID' },
         _sum: { total: true },
       }),
     ]);
