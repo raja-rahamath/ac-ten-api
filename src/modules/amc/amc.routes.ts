@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AmcController } from './amc.controller.js';
 import { authenticate, authorize } from '../../middleware/authenticate.js';
+import { requireMinimumSetup } from '../../middleware/requireOnboarding.js';
 
 const router = Router();
 const controller = new AmcController();
@@ -23,7 +24,7 @@ router.get('/payments', controller.getPayments.bind(controller));
 router.post('/payments/:paymentId/record', controller.recordPayment.bind(controller));
 
 // Contract CRUD
-router.post('/', controller.create.bind(controller));
+router.post('/', requireMinimumSetup, controller.create.bind(controller));
 router.get('/', controller.getAll.bind(controller));
 router.get('/:id', controller.getById.bind(controller));
 router.patch('/:id', controller.update.bind(controller));

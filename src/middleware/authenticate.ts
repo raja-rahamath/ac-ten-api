@@ -22,6 +22,7 @@ declare global {
         permissions: string[];
         employeeId?: string;
         departmentId?: string;
+        companyId?: string;
         customerId?: string;
       };
     }
@@ -76,6 +77,7 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
           select: {
             id: true,
             departmentId: true,
+            companyId: true,
           },
         },
         customer: {
@@ -101,6 +103,7 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
       permissions,
       employeeId: user.employee?.id,
       departmentId: user.employee?.departmentId || undefined,
+      companyId: user.employee?.companyId || undefined,
       customerId: user.customer?.id,
     };
 

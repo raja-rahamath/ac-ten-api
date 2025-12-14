@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { InvoiceController } from './invoice.controller.js';
 import { authenticate, authorize } from '../../middleware/authenticate.js';
 import { validate } from '../../middleware/validate.js';
+import { requireMinimumSetup } from '../../middleware/requireOnboarding.js';
 import {
   createInvoiceSchema,
   updateInvoiceSchema,
@@ -18,6 +19,7 @@ router.use(authenticate);
 router.post(
   '/',
   authorize('invoices:write'),
+  requireMinimumSetup,
   validate(createInvoiceSchema),
   controller.create.bind(controller)
 );

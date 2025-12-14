@@ -70,6 +70,7 @@ import currencyRoutes from './modules/currencies/currency.routes.js';
 import inventoryItemRoutes from './modules/inventory-items/inventory-item.routes.js';
 import customerPropertyRoutes from './modules/customer-properties/customer-property.routes.js';
 import customerAuthRoutes from './modules/customer-auth/customer-auth.routes.js';
+import onboardingRoutes from './modules/onboarding/onboarding.routes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -198,6 +199,7 @@ export function createApp(): Express {
   apiRouter.use('/currencies', currencyRoutes);
   apiRouter.use('/inventory-items', inventoryItemRoutes);
   apiRouter.use('/customer-properties', customerPropertyRoutes);
+  apiRouter.use('/onboarding', onboardingRoutes);
 
   // Customer-specific routes (for mobile app)
   apiRouter.use('/customer/auth', customerAuthRoutes);

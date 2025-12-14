@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { QuoteController } from './quote.controller.js';
 import { authenticate } from '../../middleware/authenticate.js';
+import { requireMinimumSetup } from '../../middleware/requireOnboarding.js';
 
 const router = Router();
 const controller = new QuoteController();
@@ -18,7 +19,7 @@ router.post('/expire-overdue', controller.expireOverdueQuotes.bind(controller));
 router.get('/versions/:quoteNo', controller.getVersionHistory.bind(controller));
 
 // CRUD routes
-router.post('/', controller.create.bind(controller));
+router.post('/', requireMinimumSetup, controller.create.bind(controller));
 router.get('/', controller.getAll.bind(controller));
 router.get('/:id', controller.getById.bind(controller));
 router.patch('/:id', controller.update.bind(controller));

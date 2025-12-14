@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { WorkOrderController } from './work-order.controller.js';
 import { authenticate } from '../../middleware/authenticate.js';
+import { requireMinimumSetup } from '../../middleware/requireOnboarding.js';
 
 const router = Router();
 const workOrderController = new WorkOrderController();
@@ -166,7 +167,7 @@ router.get('/:id', authenticate, workOrderController.getById.bind(workOrderContr
  *       201:
  *         description: Work order created
  */
-router.post('/', authenticate, workOrderController.create.bind(workOrderController));
+router.post('/', authenticate, requireMinimumSetup, workOrderController.create.bind(workOrderController));
 
 /**
  * @swagger
@@ -195,7 +196,7 @@ router.post('/', authenticate, workOrderController.create.bind(workOrderControll
  *       201:
  *         description: Work order created from quote
  */
-router.post('/from-quote', authenticate, workOrderController.createFromQuote.bind(workOrderController));
+router.post('/from-quote', authenticate, requireMinimumSetup, workOrderController.createFromQuote.bind(workOrderController));
 
 /**
  * @swagger
@@ -224,7 +225,7 @@ router.post('/from-quote', authenticate, workOrderController.createFromQuote.bin
  *       201:
  *         description: Work order created from estimate
  */
-router.post('/from-estimate', authenticate, workOrderController.createFromEstimate.bind(workOrderController));
+router.post('/from-estimate', authenticate, requireMinimumSetup, workOrderController.createFromEstimate.bind(workOrderController));
 
 /**
  * @swagger

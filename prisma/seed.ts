@@ -375,6 +375,51 @@ async function main() {
 
   console.log(`✅ Created demo company: ${demoCompany.name}`);
 
+  // Create onboarding progress for demo company (mark as completed since seed provides all required data)
+  await prisma.onboardingProgress.upsert({
+    where: { companyId: demoCompany.id },
+    update: {},
+    create: {
+      companyId: demoCompany.id,
+      setupMode: 'detailed',
+      totalSteps: 7,
+      currentStep: 7,
+      isCompleted: true,
+      completedAt: new Date(),
+      stepsCompleted: ['company', 'locations', 'services', 'organization', 'team', 'settings', 'communication'],
+      minimumMet: true,
+      hasCompanyProfile: true,
+      hasServiceType: true,
+      hasArea: true,
+      hasZone: true,
+      hasEmployee: true,
+    },
+  });
+
+  console.log('✅ Created onboarding progress (marked as completed)');
+
+  // Create business settings for demo company
+  await prisma.businessSettings.upsert({
+    where: { companyId: demoCompany.id },
+    update: {},
+    create: {
+      companyId: demoCompany.id,
+      workingDays: ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY'],
+      workStartTime: '08:00',
+      workEndTime: '17:00',
+      timezone: 'Asia/Bahrain',
+      invoicePrefix: 'INV',
+      invoiceStartNumber: 1,
+      quotePrefix: 'QUO',
+      quoteStartNumber: 1,
+      quoteValidityDays: 30,
+      receiptPrefix: 'RCP',
+      receiptStartNumber: 1,
+    },
+  });
+
+  console.log('✅ Created business settings');
+
   // Create a demo admin user
   const hashedPassword = await bcrypt.hash('Admin123', 10);
 

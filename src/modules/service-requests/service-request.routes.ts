@@ -3,6 +3,7 @@ import { ServiceRequestController } from './service-request.controller.js';
 import { authenticate, authorize } from '../../middleware/authenticate.js';
 import { validate } from '../../middleware/validate.js';
 import { uploadAttachment } from '../../middleware/upload.js';
+import { requireMinimumSetup } from '../../middleware/requireOnboarding.js';
 import {
   createServiceRequestSchema,
   updateServiceRequestSchema,
@@ -19,6 +20,7 @@ router.use(authenticate);
 router.post(
   '/',
   authorize('service_requests:write'),
+  requireMinimumSetup,
   validate(createServiceRequestSchema),
   controller.create.bind(controller)
 );

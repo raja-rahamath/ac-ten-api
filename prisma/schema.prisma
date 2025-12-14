@@ -207,8 +207,10 @@ model Company {
   updatedById String?  @map("audit_change_by")
 
   // Relations
-  divisions Division[]
-  employees Employee[]
+  divisions          Division[]
+  employees          Employee[]
+  onboardingProgress OnboardingProgress?
+  businessSettings   BusinessSettings?
 
   @@map("companies")
   @@schema("fixitbh_ac")
@@ -3256,5 +3258,78 @@ enum MembershipStatus {
   SUSPENDED
   PENDING_PAYMENT
 
+  @@schema("fixitbh_ac")
+}
+
+// ==================== ONBOARDING ====================
+
+model OnboardingProgress {
+  id        String  @id @default(cuid())
+  companyId String  @unique @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Mode selection
+  setupMode  String @default("none") @map("setup_mode") // "none", "quick", "detailed"
+  totalSteps Int    @default(0) @map("total_steps") // 4 for quick, 7 for detailed
+
+  currentStep Int       @default(0) @map("current_step") // 0 = mode not selected
+  isCompleted Boolean   @default(false) @map("is_completed")
+  completedAt DateTime? @map("completed_at")
+
+  // Step completion tracking (JSON for flexibility)
+  stepsCompleted Json @default("[]") @map("steps_completed") // ["step1", "step2", ...]
+
+  // Validation status (can create service requests)
+  minimumMet Boolean @default(false) @map("minimum_met")
+
+  // Quick reference flags for validation
+  hasCompanyProfile Boolean @default(false) @map("has_company_profile")
+  hasServiceType    Boolean @default(false) @map("has_service_type")
+  hasArea           Boolean @default(false) @map("has_area")
+  hasZone           Boolean @default(false) @map("has_zone")
+  hasEmployee       Boolean @default(false) @map("has_employee")
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("audit_create_date")
+  updatedAt DateTime @updatedAt @map("audit_change_date")
+
+  @@map("onboarding_progress")
+  @@schema("fixitbh_ac")
+}
+
+model BusinessSettings {
+  id        String  @id @default(cuid())
+  companyId String  @unique @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Working hours
+  workingDays   String[] @default(["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY"]) @map("working_days")
+  workStartTime String   @default("08:00") @map("work_start_time")
+  workEndTime   String   @default("17:00") @map("work_end_time")
+  timezone      String   @default("Asia/Bahrain")
+
+  // Document numbering
+  invoicePrefix      String @default("INV") @map("invoice_prefix")
+  invoiceStartNumber Int    @default(1) @map("invoice_start_number")
+  quotePrefix        String @default("QUO") @map("quote_prefix")
+  quoteStartNumber   Int    @default(1) @map("quote_start_number")
+  quoteValidityDays  Int    @default(30) @map("quote_validity_days")
+  receiptPrefix      String @default("RCP") @map("receipt_prefix")
+  receiptStartNumber Int    @default(1) @map("receipt_start_number")
+
+  // Email settings
+  smtpHost        String? @map("smtp_host")
+  smtpPort        Int?    @map("smtp_port")
+  smtpUser        String? @map("smtp_user")
+  smtpPassword    String? @map("smtp_password")
+  smtpFromEmail   String? @map("smtp_from_email")
+  smtpFromName    String? @map("smtp_from_name")
+  smtpSecure      Boolean @default(true) @map("smtp_secure")
+  emailConfigured Boolean @default(false) @map("email_configured")
+
+  createdAt DateTime @default(now()) @map("audit_create_date")
+  updatedAt DateTime @updatedAt @map("audit_change_date")
+
+  @@map("business_settings")
   @@schema("fixitbh_ac")
 }
