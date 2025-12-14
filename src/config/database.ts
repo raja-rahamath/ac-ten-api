@@ -19,6 +19,8 @@ const MODELS_WITHOUT_AUDIT_FIELDS = new Set([
   'CustomerUnit',
   'AmcContractProperty',
   'AmcContractService',
+  'OnboardingProgress',
+  'BusinessSettings',
 ]);
 
 function createPrismaClient() {
