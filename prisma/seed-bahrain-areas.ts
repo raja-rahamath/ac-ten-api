@@ -207,6 +207,7 @@ async function main() {
           name: areaData.name,
           nameAr: areaData.nameAr,
           code: areaData.code,
+          isActive: true,
         },
       });
       console.log(`    📍 Created area: ${area.name} (${area.nameAr})`);

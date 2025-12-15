@@ -802,8 +802,7 @@ export class CustomerAuthService {
 
     const areas = await prisma.area.findMany({
       where,
-      // Return all areas for dropdown, limit only when searching
-      take: search ? 20 : 100,
+      // Return all areas - Bahrain has ~60 areas, no need to limit
       orderBy: { name: 'asc' },
       include: {
         governorate: {
@@ -875,8 +874,9 @@ export class CustomerAuthService {
   // Email sending methods
   private async sendVerificationEmail(email: string, token: string, firstName: string) {
     const recipientEmail = this.getEmailRecipient(email);
-    // In development, point to API directly. In production, point to the portal which handles the redirect
-    const verificationUrl = `${config.isDevelopment ? 'http://localhost:4001' : 'https://api.agentcare.com'}/api/v1/customer/auth/verify?token=${token}`;
+    // Use PUBLIC_API_URL env var, fallback to localhost for dev or Hetzner server for production
+    const apiBaseUrl = process.env.PUBLIC_API_URL || (config.isDevelopment ? 'http://localhost:4001' : 'http://116.203.196.139:4001');
+    const verificationUrl = `${apiBaseUrl}/api/v1/customer/auth/verify?token=${token}`;
 
     const html = this.getVerificationEmailTemplate(firstName, verificationUrl, email);
     const text = `
@@ -905,7 +905,9 @@ The AgentCare Team
 
   private async sendPasswordResetEmail(email: string, token: string, firstName: string) {
     const recipientEmail = this.getEmailRecipient(email);
-    const resetUrl = `${config.isDevelopment ? 'http://localhost:3001' : 'https://app.agentcare.com'}/reset-password?token=${token}`;
+    // Use PUBLIC_PORTAL_URL env var, fallback to localhost for dev or Hetzner server for production
+    const portalBaseUrl = process.env.PUBLIC_PORTAL_URL || (config.isDevelopment ? 'http://localhost:3001' : 'http://116.203.196.139:3001');
+    const resetUrl = `${portalBaseUrl}/reset-password?token=${token}`;
 
     const html = this.getPasswordResetEmailTemplate(firstName, resetUrl, email);
     const text = `
