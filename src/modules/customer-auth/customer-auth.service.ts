@@ -1300,10 +1300,14 @@ The AgentCare Team
         property: { select: { id: true, name: true, building: true, areaName: true } },
         customerProperty: {
           select: {
-            unit: {
+            id: true,
+            ownershipType: true,
+            property: {
               select: {
-                unitNo: true,
-                building: { select: { name: true } },
+                id: true,
+                name: true,
+                building: true,
+                areaName: true,
               },
             },
           },
@@ -1321,8 +1325,8 @@ The AgentCare Team
         status: sr.status,
         priority: sr.priority,
         complaintType: sr.complaintType,
-        property: sr.property,
-        unit: sr.customerProperty?.unit,
+        property: sr.property || sr.customerProperty?.property,
+        customerProperty: sr.customerProperty,
         assignedTo: sr.assignedTo,
         createdAt: sr.createdAt,
         startedAt: sr.startedAt,
