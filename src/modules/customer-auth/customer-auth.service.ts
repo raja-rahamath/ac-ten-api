@@ -1227,7 +1227,8 @@ The AgentCare Team
 
     return {
       id: serviceRequest.id,
-      requestNumber: serviceRequest.requestNo,
+      requestNo: serviceRequest.requestNo,
+      requestNumber: serviceRequest.requestNo, // Legacy field
       title: serviceRequest.title,
       description: serviceRequest.description,
       status: serviceRequest.status,
@@ -1273,5 +1274,66 @@ The AgentCare Team
         color: iconConfig.color,
       };
     });
+  }
+
+  async getCustomerServiceRequests(userId: string, filter?: { status?: string }) {
+    // Get customer from user
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { customer: true },
+    });
+
+    if (!user?.customer) {
+      throw new BadRequestError('Customer not found for this user');
+    }
+
+    const where: any = { customerId: user.customer.id };
+    if (filter?.status) {
+      where.status = filter.status;
+    }
+
+    const serviceRequests = await prisma.serviceRequest.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        complaintType: { select: { name: true, nameAr: true } },
+        property: { select: { id: true, name: true, building: true, areaName: true } },
+        customerProperty: {
+          select: {
+            unit: {
+              select: {
+                unitNo: true,
+                building: { select: { name: true } },
+              },
+            },
+          },
+        },
+        assignedTo: { select: { id: true, firstName: true, lastName: true, phone: true } },
+      },
+    });
+
+    return {
+      data: serviceRequests.map(sr => ({
+        id: sr.id,
+        requestNo: sr.requestNo,
+        title: sr.title,
+        description: sr.description,
+        status: sr.status,
+        priority: sr.priority,
+        complaintType: sr.complaintType,
+        property: sr.property,
+        unit: sr.customerProperty?.unit,
+        assignedTo: sr.assignedTo,
+        createdAt: sr.createdAt,
+        startedAt: sr.startedAt,
+        completedAt: sr.completedAt,
+      })),
+      pagination: {
+        page: 1,
+        limit: 100,
+        total: serviceRequests.length,
+        totalPages: 1,
+      },
+    };
   }
 }

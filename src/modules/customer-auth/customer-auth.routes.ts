@@ -568,6 +568,33 @@ router.post(
 
 /**
  * @swagger
+ * /customer/auth/service-requests:
+ *   get:
+ *     summary: Get customer's service requests
+ *     description: Get all service requests for the authenticated customer
+ *     tags: [Customer Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         description: Filter by status (NEW, IN_PROGRESS, COMPLETED, etc.)
+ *     responses:
+ *       200:
+ *         description: List of service requests
+ *       401:
+ *         description: Unauthorized
+ */
+router.get(
+  '/service-requests',
+  authenticate,
+  controller.getServiceRequests.bind(controller)
+);
+
+/**
+ * @swagger
  * /customer/auth/service-types:
  *   get:
  *     summary: Get available service types

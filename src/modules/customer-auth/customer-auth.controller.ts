@@ -375,4 +375,27 @@ export class CustomerAuthController {
       next(error);
     }
   }
+
+  async getServiceRequests(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          error: 'Unauthorized',
+        });
+      }
+
+      const { status } = req.query;
+      const result = await service.getCustomerServiceRequests(userId, {
+        status: status as string | undefined,
+      });
+      res.status(200).json({
+        success: true,
+        ...result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
