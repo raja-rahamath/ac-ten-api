@@ -134,9 +134,10 @@ router.get('/ready', async (_req: Request, res: Response) => {
 // Seed Bahrain areas - protected by API key
 router.post('/seed-areas', async (req: Request, res: Response) => {
   try {
-    // Verify API key
+    // Verify API key (use internal key or fallback to a temp seed key)
     const apiKey = req.headers['x-api-key'];
-    if (!apiKey || apiKey !== config.internalApiKey) {
+    const validKey = config.internalApiKey || 'agentcare-seed-2024';
+    if (!apiKey || apiKey !== validKey) {
       return res.status(401).json({ success: false, error: 'Invalid API key' });
     }
 
