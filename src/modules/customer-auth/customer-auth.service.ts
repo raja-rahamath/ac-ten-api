@@ -1340,4 +1340,79 @@ The AgentCare Team
       },
     };
   }
+
+  async getCustomerServiceRequestById(userId: string, requestId: string) {
+    // Get customer from user
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { customer: true },
+    });
+
+    if (!user?.customer) {
+      throw new BadRequestError('Customer not found for this user');
+    }
+
+    const serviceRequest = await prisma.serviceRequest.findFirst({
+      where: {
+        id: requestId,
+        customerId: user.customer.id,
+      },
+      include: {
+        complaintType: { select: { name: true, nameAr: true } },
+        property: { select: { id: true, name: true, flat: true, building: true, road: true, block: true, areaName: true } },
+        customerProperty: {
+          select: {
+            id: true,
+            ownershipType: true,
+            property: {
+              select: {
+                id: true,
+                name: true,
+                flat: true,
+                building: true,
+                road: true,
+                block: true,
+                areaName: true,
+              },
+            },
+          },
+        },
+        assignedTo: { select: { id: true, firstName: true, lastName: true, phone: true } },
+      },
+    });
+
+    if (!serviceRequest) {
+      throw new NotFoundError('Service request not found');
+    }
+
+    // Build property address
+    const prop = serviceRequest.property || serviceRequest.customerProperty?.property;
+    let propertyAddress = 'No address specified';
+    if (prop) {
+      const parts = [];
+      if (prop.flat) parts.push(`Flat ${prop.flat}`);
+      if (prop.building) parts.push(`Building ${prop.building}`);
+      if (prop.road) parts.push(`Road ${prop.road}`);
+      if (prop.block) parts.push(`Block ${prop.block}`);
+      if (prop.areaName) parts.push(prop.areaName);
+      propertyAddress = parts.join(', ') || prop.name || 'No address specified';
+    }
+
+    return {
+      id: serviceRequest.id,
+      requestNo: serviceRequest.requestNo,
+      title: serviceRequest.title,
+      description: serviceRequest.description,
+      status: serviceRequest.status,
+      priority: serviceRequest.priority,
+      complaintType: serviceRequest.complaintType,
+      property: prop,
+      propertyAddress,
+      customerProperty: serviceRequest.customerProperty,
+      assignedTo: serviceRequest.assignedTo,
+      createdAt: serviceRequest.createdAt,
+      startedAt: serviceRequest.startedAt,
+      completedAt: serviceRequest.completedAt,
+    };
+  }
 }

@@ -595,6 +595,36 @@ router.get(
 
 /**
  * @swagger
+ * /customer/auth/service-requests/{id}:
+ *   get:
+ *     summary: Get service request details
+ *     description: Get details of a specific service request by ID
+ *     tags: [Customer Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Service request ID
+ *     responses:
+ *       200:
+ *         description: Service request details
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Service request not found
+ */
+router.get(
+  '/service-requests/:id',
+  authenticate,
+  controller.getServiceRequestById.bind(controller)
+);
+
+/**
+ * @swagger
  * /customer/auth/service-types:
  *   get:
  *     summary: Get available service types
