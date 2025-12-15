@@ -625,6 +625,38 @@ router.get(
 
 /**
  * @swagger
+ * /customer/auth/service-requests/{id}/cancel:
+ *   post:
+ *     summary: Cancel service request
+ *     description: Cancel a service request (only allowed when status is NEW)
+ *     tags: [Customer Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Service request ID
+ *     responses:
+ *       200:
+ *         description: Service request cancelled successfully
+ *       400:
+ *         description: Cannot cancel - request is not in NEW status
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Service request not found
+ */
+router.post(
+  '/service-requests/:id/cancel',
+  authenticate,
+  controller.cancelServiceRequest.bind(controller)
+);
+
+/**
+ * @swagger
  * /customer/auth/service-types:
  *   get:
  *     summary: Get available service types

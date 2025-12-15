@@ -419,4 +419,25 @@ export class CustomerAuthController {
       next(error);
     }
   }
+
+  async cancelServiceRequest(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          error: 'Unauthorized',
+        });
+      }
+
+      const { id } = req.params;
+      const result = await service.cancelServiceRequest(userId, id);
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

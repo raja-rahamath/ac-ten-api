@@ -757,7 +757,6 @@ async function main() {
     where: { code: 'ZONE-JUF' },
     update: {},
     create: {
-      governorateId: juffairGov.id,
       name: 'Juffair Zone',
       nameAr: 'منطقة الجفير',
       code: 'ZONE-JUF',
@@ -768,7 +767,6 @@ async function main() {
     where: { code: 'ZONE-SEEF' },
     update: {},
     create: {
-      governorateId: seefGov.id,
       name: 'Seef Zone',
       nameAr: 'منطقة السيف',
       code: 'ZONE-SEEF',
@@ -831,11 +829,11 @@ async function main() {
       id: 'demo-property-1',
       propertyNo: 'PROP-001',
       typeId: villa!.id,
-      zoneId: juffairZone.id,
       name: 'Al Juffair Villa 101',
       nameAr: 'فيلا الجفير 101',
       address: 'Building 101, Road 1234, Block 123, Juffair',
       building: '101',
+      areaName: 'Juffair',
     },
   });
 
@@ -846,13 +844,13 @@ async function main() {
       id: 'demo-property-2',
       propertyNo: 'PROP-002',
       typeId: apartment!.id,
-      zoneId: seefZone.id,
       name: 'Seef Tower Apt 501',
       nameAr: 'شقة برج السيف 501',
       address: 'Seef Tower, Block 428, Seef',
       building: '1501',
       floor: '5',
       unit: '501',
+      areaName: 'Seef',
     },
   });
 

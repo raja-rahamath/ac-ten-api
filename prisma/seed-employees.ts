@@ -585,7 +585,6 @@ async function main() {
       where: { code: zone.code },
       update: {},
       create: {
-        governorateId: gov.id,
         name: zone.name,
         nameAr: zone.nameAr,
         code: zone.code,

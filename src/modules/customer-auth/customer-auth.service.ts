@@ -1359,7 +1359,7 @@ The AgentCare Team
       },
       include: {
         complaintType: { select: { name: true, nameAr: true } },
-        property: { select: { id: true, name: true, flat: true, building: true, road: true, block: true, areaName: true } },
+        property: { select: { id: true, name: true, address: true, building: true, floor: true, unit: true, areaName: true } },
         customerProperty: {
           select: {
             id: true,
@@ -1368,10 +1368,10 @@ The AgentCare Team
               select: {
                 id: true,
                 name: true,
-                flat: true,
+                address: true,
                 building: true,
-                road: true,
-                block: true,
+                floor: true,
+                unit: true,
                 areaName: true,
               },
             },
@@ -1389,13 +1389,17 @@ The AgentCare Team
     const prop = serviceRequest.property || serviceRequest.customerProperty?.property;
     let propertyAddress = 'No address specified';
     if (prop) {
-      const parts = [];
-      if (prop.flat) parts.push(`Flat ${prop.flat}`);
-      if (prop.building) parts.push(`Building ${prop.building}`);
-      if (prop.road) parts.push(`Road ${prop.road}`);
-      if (prop.block) parts.push(`Block ${prop.block}`);
-      if (prop.areaName) parts.push(prop.areaName);
-      propertyAddress = parts.join(', ') || prop.name || 'No address specified';
+      // Prefer the address field if available
+      if (prop.address) {
+        propertyAddress = prop.address;
+      } else {
+        const parts = [];
+        if (prop.unit) parts.push(`Unit ${prop.unit}`);
+        if (prop.floor) parts.push(`Floor ${prop.floor}`);
+        if (prop.building) parts.push(`Building ${prop.building}`);
+        if (prop.areaName) parts.push(prop.areaName);
+        propertyAddress = parts.join(', ') || prop.name || 'No address specified';
+      }
     }
 
     return {
@@ -1413,6 +1417,52 @@ The AgentCare Team
       createdAt: serviceRequest.createdAt,
       startedAt: serviceRequest.startedAt,
       completedAt: serviceRequest.completedAt,
+    };
+  }
+
+  async cancelServiceRequest(userId: string, requestId: string) {
+    // Get customer from user
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { customer: true },
+    });
+
+    if (!user?.customer) {
+      throw new BadRequestError('Customer not found for this user');
+    }
+
+    // Find the service request
+    const serviceRequest = await prisma.serviceRequest.findFirst({
+      where: {
+        id: requestId,
+        customerId: user.customer.id,
+      },
+    });
+
+    if (!serviceRequest) {
+      throw new NotFoundError('Service request not found');
+    }
+
+    // Only allow cancellation if status is NEW
+    if (serviceRequest.status !== 'NEW') {
+      throw new BadRequestError(
+        'Cannot cancel this request. Only requests with NEW status can be cancelled by the customer. ' +
+        'Please contact customer care to cancel requests that are already being processed.'
+      );
+    }
+
+    // Update status to CANCELLED
+    await prisma.serviceRequest.update({
+      where: { id: requestId },
+      data: {
+        status: 'CANCELLED',
+        updatedById: userId,
+      },
+    });
+
+    return {
+      message: 'Service request cancelled successfully',
+      requestNo: serviceRequest.requestNo,
     };
   }
 }
