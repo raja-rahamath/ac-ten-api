@@ -1138,7 +1138,7 @@ The AgentCare Team
     const category = input.category || input.serviceType || 'general';
     const categoryName = CATEGORY_TO_COMPLAINT_TYPE[category.toLowerCase()] || category;
 
-    // Look up complaint type
+    // Look up complaint type (include departmentId for auto-assignment)
     let complaintType = await prisma.complaintType.findFirst({
       where: {
         name: {
@@ -1146,10 +1146,21 @@ The AgentCare Team
           mode: 'insensitive',
         },
       },
+      select: {
+        id: true,
+        name: true,
+        departmentId: true,
+      },
     });
 
     if (!complaintType) {
-      complaintType = await prisma.complaintType.findFirst();
+      complaintType = await prisma.complaintType.findFirst({
+        select: {
+          id: true,
+          name: true,
+          departmentId: true,
+        },
+      });
     }
 
     if (!complaintType) {
@@ -1203,25 +1214,62 @@ The AgentCare Team
     };
     const priority = priorityMap[(input.priority || 'normal').toLowerCase()] || 'MEDIUM';
 
+    // Auto-assignment: Find a technical head in this zone for this department
+    let assignedToId: string | null = null;
+    let assignedStatus: string = 'NEW';
+
+    if (zoneId && complaintType.departmentId) {
+      // Find an employee who is:
+      // 1. In this zone with PRIMARY_HEAD or SECONDARY_HEAD role
+      // 2. In the same department as the complaint type
+      // 3. Active
+      const eligibleEmployee = await prisma.employeeZone.findFirst({
+        where: {
+          zoneId,
+          isActive: true,
+          role: { in: ['PRIMARY_HEAD', 'SECONDARY_HEAD'] },
+          employee: {
+            isActive: true,
+            departmentId: complaintType.departmentId,
+          },
+        },
+        orderBy: [
+          { role: 'asc' }, // PRIMARY_HEAD first
+          { isPrimary: 'desc' }, // Primary zone assignment first
+        ],
+        include: {
+          employee: { select: { id: true, firstName: true, lastName: true } },
+        },
+      });
+
+      if (eligibleEmployee) {
+        assignedToId = eligibleEmployee.employee.id;
+        assignedStatus = 'ASSIGNED';
+        console.log(`Auto-assigned request to ${eligibleEmployee.employee.firstName} ${eligibleEmployee.employee.lastName}`);
+      }
+    }
+
     // Create the service request
     const serviceRequest = await prisma.serviceRequest.create({
       data: {
         requestNo,
         title: input.title,
         description: input.description,
-        status: 'NEW',
+        status: assignedStatus as any,
         priority: priority as any,
         customerId: user.customer.id,
         propertyId: input.propertyId,
         customerPropertyId: customerProperty.id,
         complaintTypeId: complaintType.id,
         zoneId,
+        assignedToId,
         source: 'AI_CHAT',
       },
       include: {
         customer: { select: { firstName: true, lastName: true, email: true } },
         property: { select: { id: true, name: true, building: true, areaName: true } },
         complaintType: { select: { name: true } },
+        assignedTo: { select: { id: true, firstName: true, lastName: true } },
       },
     });
 
@@ -1234,6 +1282,7 @@ The AgentCare Team
       status: serviceRequest.status,
       priority: serviceRequest.priority,
       category: serviceRequest.complaintType?.name,
+      assignedTo: serviceRequest.assignedTo,
       createdAt: serviceRequest.createdAt,
     };
   }
