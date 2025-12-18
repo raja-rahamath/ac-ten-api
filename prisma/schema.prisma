@@ -66,6 +66,9 @@ model User {
   estimatesRejected  Estimate[]         @relation("EstimateRejectedBy")
   estimateActivities EstimateActivity[] @relation("EstimateActivityBy")
 
+  // Work Order Activity Relations
+  workOrderActivities WorkOrderActivity[]
+
   @@map("users")
   @@schema("fixitbh_ac")
 }
@@ -338,7 +341,6 @@ model Employee {
   workOrderLabor      WorkOrderLabor[]
   workOrderChecklists WorkOrderChecklist[]
   workOrderPhotos     WorkOrderPhoto[]
-  workOrderActivities WorkOrderActivity[]
 
   // Notification Relations
   notifications Notification[]
@@ -3028,7 +3030,7 @@ model WorkOrderActivity {
   metadata    Json?
 
   performedById String   @map("performed_by_id")
-  performedBy   Employee @relation(fields: [performedById], references: [id])
+  performedBy   User     @relation(fields: [performedById], references: [id])
   performedAt   DateTime @default(now()) @map("performed_at")
 
   @@map("work_order_activities")
