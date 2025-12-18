@@ -605,6 +605,7 @@ export class WorkOrderService {
     });
 
     await this.logActivity(id, 'EN_ROUTE', 'Technician en route to site', userId);
+    await this.syncServiceRequestStatus(id, 'EN_ROUTE', userId);
 
     return updated;
   }
@@ -638,6 +639,8 @@ export class WorkOrderService {
     }
 
     await this.logActivity(id, 'ARRIVED', 'Technician arrived at site', userId);
+    // Note: ARRIVED is not a WorkOrderStatus, it's tracked in labor entry
+    // SR status stays as IN_PROGRESS (set when EN_ROUTE)
 
     return this.getById(id);
   }
@@ -667,12 +670,7 @@ export class WorkOrderService {
     });
 
     await this.logActivity(id, 'STARTED', 'Work started', userId);
-
-    // Update service request status
-    await prisma.serviceRequest.update({
-      where: { id: workOrder.serviceRequestId },
-      data: { status: 'IN_PROGRESS' },
-    });
+    await this.syncServiceRequestStatus(id, 'IN_PROGRESS', userId);
 
     return updated;
   }
@@ -871,12 +869,7 @@ export class WorkOrderService {
     });
 
     await this.logActivity(id, 'COMPLETED', 'Work order completed', userId);
-
-    // Update service request status
-    await prisma.serviceRequest.update({
-      where: { id: workOrder.serviceRequestId },
-      data: { status: 'COMPLETED' },
-    });
+    await this.syncServiceRequestStatus(id, 'COMPLETED', userId);
 
     return updated;
   }
@@ -905,6 +898,7 @@ export class WorkOrderService {
     });
 
     await this.logActivity(id, 'ON_HOLD', `Put on hold: ${data.reason}`, userId);
+    await this.syncServiceRequestStatus(id, 'ON_HOLD', userId);
 
     return updated;
   }
@@ -933,6 +927,7 @@ export class WorkOrderService {
     });
 
     await this.logActivity(id, 'RESUMED', 'Work resumed', userId);
+    await this.syncServiceRequestStatus(id, 'IN_PROGRESS', userId);
 
     return updated;
   }
@@ -987,6 +982,7 @@ export class WorkOrderService {
     });
 
     await this.logActivity(id, 'CANCELLED', `Cancelled: ${data.reason}`, userId);
+    await this.syncServiceRequestStatus(id, 'CANCELLED', userId);
 
     return updated;
   }
@@ -1178,6 +1174,72 @@ export class WorkOrderService {
         performedById: userId,
       },
     });
+  }
+
+  // Helper: Sync Service Request status based on Work Order status
+  private async syncServiceRequestStatus(
+    workOrderId: string,
+    woStatus: WorkOrderStatus,
+    userId: string
+  ) {
+    // Get the work order with its service request
+    const workOrder = await prisma.workOrder.findUnique({
+      where: { id: workOrderId },
+      select: { serviceRequestId: true },
+    });
+
+    if (!workOrder?.serviceRequestId) return;
+
+    // Map Work Order status to Service Request status
+    type RequestStatus = 'NEW' | 'ASSIGNED' | 'SCHEDULED' | 'IN_PROGRESS' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED';
+    let srStatus: RequestStatus | null = null;
+
+    switch (woStatus) {
+      case 'EN_ROUTE':
+      case 'IN_PROGRESS':
+        srStatus = 'IN_PROGRESS';
+        break;
+      case 'ON_HOLD':
+        srStatus = 'ON_HOLD';
+        break;
+      case 'COMPLETED':
+        srStatus = 'COMPLETED';
+        break;
+      case 'CANCELLED':
+        srStatus = 'CANCELLED';
+        break;
+      case 'SCHEDULED':
+      case 'CONFIRMED':
+        srStatus = 'SCHEDULED';
+        break;
+      default:
+        // Don't change SR status for other WO statuses
+        return;
+    }
+
+    if (srStatus) {
+      await prisma.serviceRequest.update({
+        where: { id: workOrder.serviceRequestId },
+        data: {
+          status: srStatus,
+          updatedById: userId,
+          // Set startedAt when work begins
+          ...(woStatus === 'EN_ROUTE' && { startedAt: new Date() }),
+          // Set completedAt when work is done
+          ...(woStatus === 'COMPLETED' && { completedAt: new Date() }),
+        },
+      });
+
+      // Log in the service request timeline
+      await prisma.requestTimeline.create({
+        data: {
+          serviceRequestId: workOrder.serviceRequestId,
+          action: `STATUS_CHANGED`,
+          description: `Status updated to ${srStatus} (synced from Work Order)`,
+          performedBy: userId,
+        },
+      });
+    }
   }
 
   // Helper: Get work order includes
