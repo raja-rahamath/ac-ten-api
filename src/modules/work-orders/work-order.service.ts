@@ -1167,6 +1167,27 @@ export class WorkOrderService {
           customer: true,
           complaintType: true,
           zone: true,
+          attachments: true,
+          property: {
+            include: {
+              areaRef: true,
+            },
+          },
+          unit: {
+            include: {
+              building: {
+                include: {
+                  block: {
+                    include: {
+                      area: true,
+                    },
+                  },
+                  road: true,
+                  area: true,
+                },
+              },
+            },
+          },
         },
       },
       customer: {
