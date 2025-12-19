@@ -2865,6 +2865,7 @@ enum WorkOrderStatus {
   SCHEDULED // Assigned to team
   CONFIRMED // Customer confirmed appointment
   EN_ROUTE // Technician on the way
+  ARRIVED // Technician arrived at site
   IN_PROGRESS // Work started
   ON_HOLD // Paused (waiting for parts, customer request)
   COMPLETED // Work finished

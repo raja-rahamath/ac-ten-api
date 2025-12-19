@@ -620,6 +620,14 @@ export class WorkOrderService {
       throw new Error('Work order not found');
     }
 
+    // Update work order status to ARRIVED
+    await prisma.workOrder.update({
+      where: { id },
+      data: {
+        status: 'ARRIVED',
+      },
+    });
+
     // Update labor entry
     const labor = await prisma.workOrderLabor.findFirst({
       where: {
@@ -639,8 +647,6 @@ export class WorkOrderService {
     }
 
     await this.logActivity(id, 'ARRIVED', 'Technician arrived at site', userId);
-    // Note: ARRIVED is not a WorkOrderStatus, it's tracked in labor entry
-    // SR status stays as IN_PROGRESS (set when EN_ROUTE)
 
     return this.getById(id);
   }
@@ -655,8 +661,8 @@ export class WorkOrderService {
       throw new Error('Work order not found');
     }
 
-    if (!['SCHEDULED', 'CONFIRMED', 'EN_ROUTE'].includes(workOrder.status)) {
-      throw new Error('Work order must be scheduled, confirmed, or en route to start work');
+    if (!['SCHEDULED', 'CONFIRMED', 'EN_ROUTE', 'ARRIVED'].includes(workOrder.status)) {
+      throw new Error('Work order must be scheduled, confirmed, en route, or arrived to start work');
     }
 
     const updated = await prisma.workOrder.update({
