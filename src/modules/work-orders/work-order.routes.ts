@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { WorkOrderController } from './work-order.controller.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { requireMinimumSetup } from '../../middleware/requireOnboarding.js';
+import { uploadAttachment } from '../../middleware/upload.js';
 
 const router = Router();
 const workOrderController = new WorkOrderController();
@@ -465,7 +466,7 @@ router.post('/:id/items', authenticate, workOrderController.addItem.bind(workOrd
  *       200:
  *         description: Photo added
  */
-router.post('/:id/photos', authenticate, workOrderController.addPhoto.bind(workOrderController));
+router.post('/:id/photos', authenticate, uploadAttachment, workOrderController.addPhoto.bind(workOrderController));
 
 /**
  * @swagger

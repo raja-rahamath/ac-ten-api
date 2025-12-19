@@ -12,12 +12,22 @@ if (!fs.existsSync(uploadsDir)) {
 // Configure storage
 const storage = multer.diskStorage({
   destination: (req: Request, file: Express.Multer.File, cb) => {
-    // Create subdirectory based on service request ID if available
-    const serviceRequestId = req.params.id;
+    // Create subdirectory based on route type and ID
+    const id = req.params.id;
     let uploadPath = uploadsDir;
 
-    if (serviceRequestId) {
-      uploadPath = path.join(uploadsDir, 'service-requests', serviceRequestId);
+    // Determine upload type from route
+    const routePath = req.baseUrl || req.path;
+    let uploadType = 'general';
+
+    if (routePath.includes('work-orders')) {
+      uploadType = 'work-orders';
+    } else if (routePath.includes('service-requests')) {
+      uploadType = 'service-requests';
+    }
+
+    if (id) {
+      uploadPath = path.join(uploadsDir, uploadType, id);
       if (!fs.existsSync(uploadPath)) {
         fs.mkdirSync(uploadPath, { recursive: true });
       }

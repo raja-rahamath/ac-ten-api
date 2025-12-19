@@ -330,19 +330,42 @@ export class WorkOrderController {
     }
   }
 
-  // Add photo
+  // Add photo (file upload)
   async addPhoto(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const data = addPhotoSchema.parse(req.body);
       const userId = req.user?.id;
 
       if (!userId) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'No file uploaded' },
+        });
+      }
+
+      // Get photo metadata from body
+      const photoType = (req.body.photoType || 'DURING') as 'BEFORE' | 'DURING' | 'AFTER' | 'ISSUE' | 'SIGNATURE' | 'OTHER';
+      const caption = req.body.caption;
+
+      // Build file path relative to uploads directory
+      const relativePath = `/uploads/work-orders/${id}/${file.filename}`;
+
+      const data = {
+        url: relativePath,
+        photoType,
+        caption,
+      };
+
       const workOrder = await this.workOrderService.addPhoto(id, data, userId);
-      res.json(workOrder);
+      res.json({
+        success: true,
+        data: workOrder,
+      });
     } catch (error) {
       next(error);
     }
