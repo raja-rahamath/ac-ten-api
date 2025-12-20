@@ -605,7 +605,7 @@ export class WorkOrderService {
     });
 
     await this.logActivity(id, 'EN_ROUTE', 'Technician en route to site', userId);
-    await this.syncServiceRequestStatus(id, 'EN_ROUTE', userId);
+    // Note: EN_ROUTE doesn't change service request status - only actual work start (IN_PROGRESS) does
 
     return updated;
   }
@@ -1201,7 +1201,6 @@ export class WorkOrderService {
     let srStatus: RequestStatus | null = null;
 
     switch (woStatus) {
-      case 'EN_ROUTE':
       case 'IN_PROGRESS':
         srStatus = 'IN_PROGRESS';
         break;
