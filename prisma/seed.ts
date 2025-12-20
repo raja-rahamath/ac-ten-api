@@ -202,6 +202,7 @@ async function main() {
     // Read permissions for dropdowns in service request forms
     ['zones', 'read'], ['governorates', 'read'], ['complaint-types', 'read'], ['properties', 'read'],
     ['action-templates', 'read'], // For completing service requests
+    ['inventory-items', 'read'], // For adding materials/parts to work orders
   ];
   for (const [resource, action] of technicianPerms) {
     const perm = findPerm(resource, action);
