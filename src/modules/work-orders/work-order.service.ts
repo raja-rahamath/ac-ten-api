@@ -800,18 +800,18 @@ export class WorkOrderService {
   }
 
   // Add photo
-  async addPhoto(id: string, data: AddPhotoInput, userId: string) {
+  async addPhoto(id: string, data: AddPhotoInput, employeeId: string, userId: string) {
     await prisma.workOrderPhoto.create({
       data: {
         workOrderId: id,
         url: data.url,
         photoType: data.photoType,
         caption: data.caption,
-        takenById: userId,
+        takenById: employeeId, // References Employee
       },
     });
 
-    await this.logActivity(id, 'PHOTO_ADDED', `${data.photoType} photo added`, userId);
+    await this.logActivity(id, 'PHOTO_ADDED', `${data.photoType} photo added`, userId); // References User
 
     return this.getById(id);
   }

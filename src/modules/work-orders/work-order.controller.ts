@@ -334,6 +334,11 @@ export class WorkOrderController {
   async addPhoto(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
 
       // employeeId is required - takenById references Employee, not User
       const employeeId = req.body.employeeId;
@@ -365,7 +370,8 @@ export class WorkOrderController {
         caption,
       };
 
-      const workOrder = await this.workOrderService.addPhoto(id, data, employeeId);
+      // Pass both employeeId (for takenById) and userId (for activity log)
+      const workOrder = await this.workOrderService.addPhoto(id, data, employeeId, userId);
       res.json({
         success: true,
         data: workOrder,
