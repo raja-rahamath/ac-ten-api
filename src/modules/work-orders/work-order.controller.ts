@@ -334,10 +334,14 @@ export class WorkOrderController {
   async addPhoto(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const userId = req.user?.id;
 
-      if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      // employeeId is required - takenById references Employee, not User
+      const employeeId = req.body.employeeId;
+      if (!employeeId) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Employee ID is required' },
+        });
       }
 
       const file = req.file;
@@ -361,7 +365,7 @@ export class WorkOrderController {
         caption,
       };
 
-      const workOrder = await this.workOrderService.addPhoto(id, data, userId);
+      const workOrder = await this.workOrderService.addPhoto(id, data, employeeId);
       res.json({
         success: true,
         data: workOrder,
