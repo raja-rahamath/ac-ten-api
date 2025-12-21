@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { config } from '../config/index.js';
 import { prisma } from '../config/database.js';
 
@@ -26,12 +26,12 @@ export async function classifyServiceRequest(
   }
 
   // If no API key, return a simple keyword-based classification
-  if (!config.anthropicApiKey) {
+  if (!config.openaiApiKey) {
     return keywordBasedClassification(title, description, selectedTypeId, serviceTypes);
   }
 
-  const anthropic = new Anthropic({
-    apiKey: config.anthropicApiKey,
+  const openai = new OpenAI({
+    apiKey: config.openaiApiKey,
   });
 
   const serviceTypeList = serviceTypes
@@ -55,19 +55,23 @@ Analyze the issue and respond with JSON only (no markdown, no code blocks):
 }`;
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
       max_tokens: 256,
       messages: [{ role: 'user', content: prompt }],
     });
 
-    const content = response.content[0];
-    if (content.type !== 'text') {
-      throw new Error('Unexpected response type');
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error('Empty response from OpenAI');
     }
 
-    // Parse the JSON response
-    const result = JSON.parse(content.text);
+    // Parse the JSON response (handle potential markdown code blocks)
+    let jsonContent = content.trim();
+    if (jsonContent.startsWith('```')) {
+      jsonContent = jsonContent.replace(/```json?\n?/g, '').replace(/```\n?$/g, '');
+    }
+    const result = JSON.parse(jsonContent);
 
     // Check if the selected type matches the suggested type
     const matches = !selectedTypeId || selectedTypeId === result.suggestedTypeId;
