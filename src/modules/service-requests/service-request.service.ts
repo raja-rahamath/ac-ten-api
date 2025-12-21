@@ -450,6 +450,7 @@ export class ServiceRequestService {
     if (input.title) updateData.title = input.title;
     if (input.description !== undefined) updateData.description = input.description;
     if (input.internalNotes !== undefined) updateData.internalNotes = input.internalNotes;
+    if (input.complaintTypeId) updateData.complaintTypeId = input.complaintTypeId;
 
     const serviceRequest = await prisma.serviceRequest.update({
       where: { id },
@@ -470,6 +471,19 @@ export class ServiceRequestService {
           serviceRequestId: id,
           action: 'STATUS_CHANGED',
           description: `Status changed from ${existing.status} to ${input.status}`,
+          performedBy: userId,
+        },
+      });
+    }
+
+    // Create timeline entry for service type change
+    if (input.complaintTypeId && input.complaintTypeId !== existing.complaintTypeId) {
+      const newTypeName = serviceRequest.complaintType?.name || 'Unknown';
+      await prisma.requestTimeline.create({
+        data: {
+          serviceRequestId: id,
+          action: 'TYPE_CHANGED',
+          description: `Service type changed to ${newTypeName}`,
           performedBy: userId,
         },
       });

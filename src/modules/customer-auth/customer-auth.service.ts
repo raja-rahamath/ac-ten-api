@@ -1282,7 +1282,7 @@ The AgentCare Team
         complaintTypeId: complaintType.id,
         zoneId,
         assignedToId,
-        source: 'AI_CHAT',
+        source: 'MOBILE',
       },
       include: {
         customer: { select: { firstName: true, lastName: true, email: true } },

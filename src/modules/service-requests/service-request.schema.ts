@@ -28,6 +28,7 @@ export const updateServiceRequestSchema = z.object({
     status: z.enum(['NEW', 'ASSIGNED', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CANCELLED', 'CLOSED']).optional(),
     priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'EMERGENCY']).optional(),
     assignedEmployeeId: z.string().optional(),
+    complaintTypeId: z.string().optional(),
     title: z.string().min(1).optional(),
     description: z.string().optional(),
     resolution: z.string().optional(),

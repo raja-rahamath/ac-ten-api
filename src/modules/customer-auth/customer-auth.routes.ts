@@ -700,4 +700,63 @@ router.get(
   controller.getServiceTypes.bind(controller)
 );
 
+/**
+ * @swagger
+ * /customer/auth/classify-service:
+ *   post:
+ *     summary: Classify service type
+ *     description: Use AI to validate and suggest the correct service type for an issue
+ *     tags: [Customer Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title]
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 description: Issue title
+ *               description:
+ *                 type: string
+ *                 description: Issue description
+ *               selectedTypeId:
+ *                 type: string
+ *                 description: Currently selected service type ID (to check if it matches)
+ *     responses:
+ *       200:
+ *         description: Classification result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     suggestedTypeId:
+ *                       type: string
+ *                     suggestedTypeName:
+ *                       type: string
+ *                     confidence:
+ *                       type: string
+ *                       enum: [high, medium, low]
+ *                     matches:
+ *                       type: boolean
+ *                     explanation:
+ *                       type: string
+ *       401:
+ *         description: Unauthorized
+ */
+router.post(
+  '/classify-service',
+  authenticate,
+  controller.classifyService.bind(controller)
+);
+
 export default router;

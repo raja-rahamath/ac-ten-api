@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { CustomerAuthService } from './customer-auth.service.js';
+import { classifyServiceRequest } from '../../services/ai-classification.service.js';
 
 const service = new CustomerAuthService();
 
@@ -367,6 +368,32 @@ export class CustomerAuthController {
   async getServiceTypes(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await service.getServiceTypes();
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async classifyService(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { title, description, selectedTypeId } = req.body;
+
+      if (!title) {
+        return res.status(400).json({
+          success: false,
+          error: 'Title is required for classification',
+        });
+      }
+
+      const result = await classifyServiceRequest(
+        title,
+        description || '',
+        selectedTypeId
+      );
+
       res.status(200).json({
         success: true,
         data: result,

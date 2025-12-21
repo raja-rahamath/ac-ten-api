@@ -29,6 +29,7 @@ export const config = {
 
   // AI Service
   aiServiceUrl: process.env.AI_SERVICE_URL || 'http://localhost:8000',
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
 
   // SMTP/Email
   smtp: {
