@@ -1365,7 +1365,7 @@ The AgentCare Team
       orderBy: { createdAt: 'desc' },
       include: {
         complaintType: { select: { name: true, nameAr: true } },
-        property: { select: { id: true, name: true, building: true, road: true, block: true, flat: true, areaName: true, address: true } },
+        property: { select: { id: true, name: true, propertyNo: true, building: true, floor: true, unit: true, areaName: true, address: true } },
         customerProperty: {
           select: {
             id: true,
@@ -1374,10 +1374,10 @@ The AgentCare Team
               select: {
                 id: true,
                 name: true,
+                propertyNo: true,
                 building: true,
-                road: true,
-                block: true,
-                flat: true,
+                floor: true,
+                unit: true,
                 areaName: true,
                 address: true,
               },
@@ -1431,7 +1431,7 @@ The AgentCare Team
       },
       include: {
         complaintType: { select: { name: true, nameAr: true } },
-        property: { select: { id: true, name: true, address: true, building: true, road: true, block: true, flat: true, floor: true, unit: true, areaName: true } },
+        property: { select: { id: true, name: true, propertyNo: true, address: true, building: true, floor: true, unit: true, areaName: true } },
         customerProperty: {
           select: {
             id: true,
@@ -1440,11 +1440,9 @@ The AgentCare Team
               select: {
                 id: true,
                 name: true,
+                propertyNo: true,
                 address: true,
                 building: true,
-                road: true,
-                block: true,
-                flat: true,
                 floor: true,
                 unit: true,
                 areaName: true,
@@ -1467,16 +1465,28 @@ The AgentCare Team
       // Prefer the address field if available
       if (prop.address) {
         propertyAddress = prop.address;
+      } else if (prop.propertyNo) {
+        // Parse propertyNo format: Flat-Building-Road-Block or Building-Road-Block
+        const parts = prop.propertyNo.split('-');
+        if (parts.length >= 4) {
+          // Has flat: Flat-Building-Road-Block
+          propertyAddress = `Flat: ${parts[0]}, Building: ${parts[1]}, Road: ${parts[2]}, Block: ${parts[3]}`;
+          if (prop.areaName) propertyAddress += `, Area: ${prop.areaName}`;
+        } else if (parts.length === 3) {
+          // No flat (Villa): Building-Road-Block
+          propertyAddress = `Building: ${parts[0]}, Road: ${parts[1]}, Block: ${parts[2]}`;
+          if (prop.areaName) propertyAddress += `, Area: ${prop.areaName}`;
+        } else {
+          propertyAddress = prop.name || 'No address specified';
+        }
       } else {
-        // Build address in format: Flat: X, Building: Y, Road: Z, Block: W, Area: A
-        const parts: string[] = [];
-        if (prop.flat) parts.push(`Flat: ${prop.flat}`);
-        if (prop.unit) parts.push(`Flat: ${prop.unit}`);
-        if (prop.building) parts.push(`Building: ${prop.building}`);
-        if (prop.road) parts.push(`Road: ${prop.road}`);
-        if (prop.block) parts.push(`Block: ${prop.block}`);
-        if (prop.areaName) parts.push(`Area: ${prop.areaName}`);
-        propertyAddress = parts.join(', ') || prop.name || 'No address specified';
+        // Fallback to available fields
+        const addrParts: string[] = [];
+        if (prop.unit) addrParts.push(`Unit: ${prop.unit}`);
+        if (prop.floor) addrParts.push(`Floor: ${prop.floor}`);
+        if (prop.building) addrParts.push(`Building: ${prop.building}`);
+        if (prop.areaName) addrParts.push(`Area: ${prop.areaName}`);
+        propertyAddress = addrParts.join(', ') || prop.name || 'No address specified';
       }
     }
 
