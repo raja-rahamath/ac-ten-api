@@ -73,7 +73,7 @@ export const registerPropertySchema = z.object({
     // Option 1: Combined format like "1-1458-3435-334-Mahooz"
     propertyAddress: z.string().optional(),
     // Option 2: Individual fields
-    flat: z.string().optional(),
+    flat: z.string().optional(), // Optional - villas don't have flat numbers
     building: z.string().optional(),
     road: z.string().optional(),
     block: z.string().optional(),
@@ -84,13 +84,14 @@ export const registerPropertySchema = z.object({
     ownershipType: z.enum(['OWNER', 'TENANT', 'PROPERTY_MANAGER', 'AUTHORIZED_CONTACT']).optional().default('TENANT'),
   }).refine(
     (data) => {
-      // Either propertyAddress OR all individual fields must be provided
+      // Either propertyAddress OR required individual fields must be provided
+      // Note: flat is optional (villas don't have flat numbers)
       const hasAddress = !!data.propertyAddress;
-      const hasAllFields = !!(data.flat && data.building && data.road && data.block && data.areaName);
-      return hasAddress || hasAllFields;
+      const hasRequiredFields = !!(data.building && data.road && data.block && data.areaName);
+      return hasAddress || hasRequiredFields;
     },
     {
-      message: 'Either propertyAddress (format: Flat-Building-Road-Block-Area) or all individual fields (flat, building, road, block, areaName) are required',
+      message: 'Either propertyAddress (format: Flat-Building-Road-Block-Area) or required fields (building, road, block, areaName) are required. Flat is optional.',
     }
   ),
 });

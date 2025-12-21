@@ -381,6 +381,20 @@ export class WorkOrderController {
     }
   }
 
+  // Get photos for work order
+  async getPhotos(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const photos = await this.workOrderService.getPhotos(id);
+      res.json({
+        success: true,
+        data: photos,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // Complete work order
   async complete(req: Request, res: Response, next: NextFunction) {
     try {

@@ -816,6 +816,25 @@ export class WorkOrderService {
     return this.getById(id);
   }
 
+  // Get photos for a work order
+  async getPhotos(workOrderId: string) {
+    const photos = await prisma.workOrderPhoto.findMany({
+      where: { workOrderId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        takenBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    return photos;
+  }
+
   // Complete work order
   async complete(id: string, data: CompleteWorkOrderInput, userId: string) {
     const workOrder = await prisma.workOrder.findUnique({

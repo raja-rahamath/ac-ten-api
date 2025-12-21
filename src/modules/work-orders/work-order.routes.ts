@@ -470,6 +470,26 @@ router.post('/:id/photos', authenticate, uploadAttachment, workOrderController.a
 
 /**
  * @swagger
+ * /work-orders/{id}/photos:
+ *   get:
+ *     summary: Get photos for work order
+ *     tags: [Work Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of photos
+ */
+router.get('/:id/photos', authenticate, workOrderController.getPhotos.bind(workOrderController));
+
+/**
+ * @swagger
  * /work-orders/{id}/complete:
  *   post:
  *     summary: Complete work order

@@ -550,15 +550,15 @@ export class CustomerAuthService {
       block = parts[3];
       areaName = parts.slice(4).join('-'); // Join remaining parts in case area has dashes
     } else {
-      flat = input.flat!;
+      flat = input.flat || ''; // Flat is optional (villas don't have flat numbers)
       building = input.building!;
       road = input.road!;
       block = input.block!;
       areaName = input.areaName!;
     }
 
-    // Pad numbers with leading zeros
-    const paddedFlat = flat.padStart(4, '0');
+    // Pad numbers with leading zeros (flat is optional, only pad if provided)
+    const paddedFlat = flat ? flat.padStart(4, '0') : '';
     const paddedBuilding = building.padStart(5, '0');
     const paddedRoad = road.padStart(4, '0');
     const paddedBlock = block.padStart(4, '0');
@@ -569,40 +569,59 @@ export class CustomerAuthService {
       throw new BadRequestError(`Area "${areaName}" not found. Please check the spelling or contact support.`);
     }
 
-    // Generate property number
-    const propertyNo = `${paddedFlat}-${paddedBuilding}-${paddedRoad}-${paddedBlock}`;
+    // Generate property number (flat is optional)
+    const propertyNo = paddedFlat
+      ? `${paddedFlat}-${paddedBuilding}-${paddedRoad}-${paddedBlock}`
+      : `${paddedBuilding}-${paddedRoad}-${paddedBlock}`;
 
     // Check if property already exists
     let property = await prisma.property.findUnique({
       where: { propertyNo },
     });
 
-    // Get default property type (Apartment) if not provided
+    // Get default property type - use Villa if no flat, otherwise Apartment
     let propertyTypeId = input.propertyTypeId;
     if (!propertyTypeId) {
+      const defaultTypeName = paddedFlat ? 'Apartment' : 'Villa';
       const defaultType = await prisma.propertyType.findFirst({
-        where: { name: 'Apartment' },
+        where: { name: defaultTypeName },
       });
-      propertyTypeId = defaultType?.id;
+      // Fallback to Apartment if Villa not found
+      if (!defaultType) {
+        const fallbackType = await prisma.propertyType.findFirst({
+          where: { name: 'Apartment' },
+        });
+        propertyTypeId = fallbackType?.id;
+      } else {
+        propertyTypeId = defaultType.id;
+      }
     }
 
     if (!propertyTypeId) {
       throw new BadRequestError('Property type not found');
     }
 
+    // Generate property name and address based on whether flat is provided
+    const propertyName = paddedFlat
+      ? `Unit ${paddedFlat}, Building ${paddedBuilding}`
+      : `Building ${paddedBuilding}`;
+    const propertyAddress = paddedFlat
+      ? `Flat ${flat}, Building ${building}, Road ${road}, Block ${block}, ${area.name}`
+      : `Building ${building}, Road ${road}, Block ${block}, ${area.name}`;
+
     // Create or use existing property
     if (!property) {
       property = await prisma.property.create({
         data: {
           propertyNo,
-          name: `Unit ${paddedFlat}, Building ${paddedBuilding}`,
+          name: propertyName,
           typeId: propertyTypeId,
           areaId: area.id,
           building: paddedBuilding,
           floor: '', // Can be derived from flat number if needed
-          unit: paddedFlat,
+          unit: paddedFlat || null,
           areaName: area.name,
-          address: `Flat ${flat}, Building ${building}, Road ${road}, Block ${block}, ${area.name}`,
+          address: propertyAddress,
           isActive: true,
           createdById: userId,
         },
