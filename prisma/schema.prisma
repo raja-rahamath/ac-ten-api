@@ -1,6 +1,7 @@
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["multiSchema"]
+  binaryTargets   = ["native", "linux-musl-arm64-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -1328,10 +1329,13 @@ model ServiceRequest {
   internalNotes      String?           @map("internal_notes")
   assignedToId       String?           @map("assigned_to_id")
   assignedTo         Employee?         @relation("AssignedEmployee", fields: [assignedToId], references: [id])
+  scheduledDate      DateTime?         @map("scheduled_date")
+  scheduledTime      String?           @map("scheduled_time") // e.g., "09:00" or "09:00-12:00"
   slaStartAt         DateTime?         @map("sla_start_at")
   slaDueAt           DateTime?         @map("sla_due_at")
   startedAt          DateTime?         @map("started_at")
   completedAt        DateTime?         @map("completed_at")
+  resolution         String?           // Resolution notes when completed
   closedAt           DateTime?         @map("closed_at")
   createdAt          DateTime          @default(now()) @map("audit_create_date")
   createdById        String?           @map("audit_create_by")

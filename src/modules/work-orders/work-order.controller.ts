@@ -84,7 +84,9 @@ export class WorkOrderController {
   async getAll(req: Request, res: Response, next: NextFunction) {
     try {
       const query = workOrderQuerySchema.parse(req.query);
-      const result = await this.workOrderService.getAll(query);
+      // Pass user ID for assignedToMe filter
+      const userId = req.user?.id;
+      const result = await this.workOrderService.getAll(query, userId);
       res.json(result);
     } catch (error) {
       next(error);

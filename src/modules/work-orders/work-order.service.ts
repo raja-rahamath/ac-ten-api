@@ -283,7 +283,7 @@ export class WorkOrderService {
   }
 
   // Get all work orders
-  async getAll(query: WorkOrderQueryInput) {
+  async getAll(query: WorkOrderQueryInput, currentUserId?: string) {
     const {
       page,
       limit,
@@ -293,20 +293,33 @@ export class WorkOrderService {
       serviceRequestId,
       customerId,
       assignedToId,
+      assignedToMe,
       fromDate,
       toDate,
       sortBy,
       sortOrder,
     } = query;
 
+    // If assignedToMe is true, find the employee ID from the user ID
+    let effectiveAssignedToId = assignedToId;
+    if (assignedToMe && currentUserId) {
+      const employee = await prisma.employee.findUnique({
+        where: { userId: currentUserId },
+        select: { id: true },
+      });
+      if (employee) {
+        effectiveAssignedToId = employee.id;
+      }
+    }
+
     const where: Prisma.WorkOrderWhereInput = {
       ...(status && { status }),
       ...(priority && { priority }),
       ...(serviceRequestId && { serviceRequestId }),
       ...(customerId && { customerId }),
-      ...(assignedToId && {
+      ...(effectiveAssignedToId && {
         team: {
-          some: { employeeId: assignedToId },
+          some: { employeeId: effectiveAssignedToId },
         },
       }),
       ...(search && {

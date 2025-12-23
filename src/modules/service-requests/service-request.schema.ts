@@ -35,6 +35,9 @@ export const updateServiceRequestSchema = z.object({
     internalNotes: z.string().optional(),
     preferredDate: z.string().datetime().optional(),
     preferredTimeSlot: z.string().optional(),
+    // Scheduling fields - set by technician after calling customer
+    scheduledDate: z.string().datetime().optional(),
+    scheduledTime: z.string().optional(), // e.g., "09:00" or "09:00-12:00"
   }),
 });
 
@@ -62,6 +65,7 @@ export const listServiceRequestsSchema = z.object({
     priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'EMERGENCY']).optional(),
     customerId: z.string().optional(),
     assignedEmployeeId: z.string().optional(),
+    assignedToMe: z.coerce.boolean().optional(), // Filter by current user's assigned requests (for technician app)
     zoneId: z.string().optional(),
     zoneIds: z.string().optional(), // Comma-separated zone IDs for technicians
     complaintTypeId: z.string().optional(),

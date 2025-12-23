@@ -222,6 +222,7 @@ export const workOrderQuerySchema = z.object({
   serviceRequestId: z.string().optional(),
   customerId: z.string().optional(),
   assignedToId: z.string().optional(),
+  assignedToMe: z.coerce.boolean().optional(), // Filter by current user's assigned jobs
   fromDate: z.string().optional(),
   toDate: z.string().optional(),
   sortBy: z.enum(['createdAt', 'scheduledDate', 'workOrderNo', 'priority']).default('scheduledDate'),

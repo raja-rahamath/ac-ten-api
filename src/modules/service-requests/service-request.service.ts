@@ -297,8 +297,8 @@ export class ServiceRequestService {
     return serviceRequest;
   }
 
-  async findAll(query: ListServiceRequestsQuery, userContext?: { role: string; departmentId?: string }) {
-    const { search, status, priority, customerId, assignedEmployeeId, zoneId, zoneIds, complaintTypeId, dateFrom, dateTo } = query;
+  async findAll(query: ListServiceRequestsQuery, userContext?: { role: string; departmentId?: string; userId?: string }) {
+    const { search, status, priority, customerId, assignedEmployeeId, assignedToMe, zoneId, zoneIds, complaintTypeId, dateFrom, dateTo } = query;
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -323,7 +323,19 @@ export class ServiceRequestService {
     if (status) where.status = status;
     if (priority) where.priority = priority;
     if (customerId) where.customerId = customerId;
-    if (assignedEmployeeId) where.assignedToId = assignedEmployeeId;
+
+    // Handle assignedToMe - find employee ID from user ID
+    if (assignedToMe && userContext?.userId) {
+      const employee = await prisma.employee.findUnique({
+        where: { userId: userContext.userId },
+        select: { id: true },
+      });
+      if (employee) {
+        where.assignedToId = employee.id;
+      }
+    } else if (assignedEmployeeId) {
+      where.assignedToId = assignedEmployeeId;
+    }
     if (complaintTypeId) where.complaintTypeId = complaintTypeId;
 
     // Date range filter
@@ -379,6 +391,18 @@ export class ServiceRequestService {
             select: {
               id: true,
               name: true,
+              propertyNo: true,
+              building: true,
+              floor: true,
+              unit: true,
+              areaName: true,
+              address: true,
+              areaRef: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
             },
           },
           unit: {
@@ -451,6 +475,9 @@ export class ServiceRequestService {
     if (input.description !== undefined) updateData.description = input.description;
     if (input.internalNotes !== undefined) updateData.internalNotes = input.internalNotes;
     if (input.complaintTypeId) updateData.complaintTypeId = input.complaintTypeId;
+    // Scheduling fields
+    if (input.scheduledDate) updateData.scheduledDate = new Date(input.scheduledDate);
+    if (input.scheduledTime !== undefined) updateData.scheduledTime = input.scheduledTime;
 
     const serviceRequest = await prisma.serviceRequest.update({
       where: { id },
@@ -484,6 +511,22 @@ export class ServiceRequestService {
           serviceRequestId: id,
           action: 'TYPE_CHANGED',
           description: `Service type changed to ${newTypeName}`,
+          performedBy: userId,
+        },
+      });
+    }
+
+    // Create timeline entry for scheduling
+    if (input.scheduledDate || input.scheduledTime) {
+      const dateStr = input.scheduledDate
+        ? new Date(input.scheduledDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+        : 'TBD';
+      const timeStr = input.scheduledTime || 'TBD';
+      await prisma.requestTimeline.create({
+        data: {
+          serviceRequestId: id,
+          action: 'SCHEDULED',
+          description: `Visit scheduled for ${dateStr} at ${timeStr}`,
           performedBy: userId,
         },
       });
@@ -745,6 +788,231 @@ export class ServiceRequestService {
         serviceRequestId,
         action: 'ASSET_UNLINKED',
         description: `Asset unlinked: ${assetName}`,
+        performedBy: userId,
+      },
+    });
+
+    return serviceRequest;
+  }
+
+  // Technician workflow methods
+  async startRoute(serviceRequestId: string, employeeId: string, userId?: string) {
+    const existing = await prisma.serviceRequest.findUnique({
+      where: { id: serviceRequestId },
+      include: { assignedTo: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('Service request not found');
+    }
+
+    // Update status to IN_PROGRESS (or we could add EN_ROUTE status)
+    const serviceRequest = await prisma.serviceRequest.update({
+      where: { id: serviceRequestId },
+      data: {
+        status: 'IN_PROGRESS',
+        startedAt: new Date(),
+      },
+      include: {
+        customer: true,
+        property: true,
+        zone: true,
+        complaintType: true,
+        assignedTo: true,
+      },
+    });
+
+    // Create timeline entry
+    await prisma.requestTimeline.create({
+      data: {
+        serviceRequestId,
+        action: 'EN_ROUTE',
+        description: 'Technician started route to location',
+        performedBy: userId,
+      },
+    });
+
+    return serviceRequest;
+  }
+
+  async markArrived(serviceRequestId: string, employeeId: string, userId?: string) {
+    const existing = await prisma.serviceRequest.findUnique({
+      where: { id: serviceRequestId },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('Service request not found');
+    }
+
+    // Keep status as IN_PROGRESS
+    const serviceRequest = await prisma.serviceRequest.findUnique({
+      where: { id: serviceRequestId },
+      include: {
+        customer: true,
+        property: true,
+        zone: true,
+        complaintType: true,
+        assignedTo: true,
+      },
+    });
+
+    // Create timeline entry
+    await prisma.requestTimeline.create({
+      data: {
+        serviceRequestId,
+        action: 'ARRIVED',
+        description: 'Technician arrived at location',
+        performedBy: userId,
+      },
+    });
+
+    return serviceRequest;
+  }
+
+  async startWork(serviceRequestId: string, employeeId: string, userId?: string) {
+    const existing = await prisma.serviceRequest.findUnique({
+      where: { id: serviceRequestId },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('Service request not found');
+    }
+
+    // Update status to IN_PROGRESS if not already
+    const serviceRequest = await prisma.serviceRequest.update({
+      where: { id: serviceRequestId },
+      data: {
+        status: 'IN_PROGRESS',
+        startedAt: existing.startedAt || new Date(),
+      },
+      include: {
+        customer: true,
+        property: true,
+        zone: true,
+        complaintType: true,
+        assignedTo: true,
+      },
+    });
+
+    // Create timeline entry
+    await prisma.requestTimeline.create({
+      data: {
+        serviceRequestId,
+        action: 'WORK_STARTED',
+        description: 'Work started on service request',
+        performedBy: userId,
+      },
+    });
+
+    return serviceRequest;
+  }
+
+  async complete(serviceRequestId: string, resolution?: string, userId?: string) {
+    const existing = await prisma.serviceRequest.findUnique({
+      where: { id: serviceRequestId },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('Service request not found');
+    }
+
+    // Update status to COMPLETED
+    const serviceRequest = await prisma.serviceRequest.update({
+      where: { id: serviceRequestId },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        resolution: resolution || 'Work completed',
+      },
+      include: {
+        customer: true,
+        property: true,
+        zone: true,
+        complaintType: true,
+        assignedTo: true,
+      },
+    });
+
+    // Create timeline entry
+    await prisma.requestTimeline.create({
+      data: {
+        serviceRequestId,
+        action: 'COMPLETED',
+        description: resolution || 'Service request completed',
+        performedBy: userId,
+      },
+    });
+
+    return serviceRequest;
+  }
+
+  // Clock in - start tracking time
+  async clockIn(serviceRequestId: string, employeeId: string, userId?: string) {
+    const existing = await prisma.serviceRequest.findUnique({
+      where: { id: serviceRequestId },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('Service request not found');
+    }
+
+    // Update status to IN_PROGRESS and set startedAt if not already
+    const serviceRequest = await prisma.serviceRequest.update({
+      where: { id: serviceRequestId },
+      data: {
+        status: 'IN_PROGRESS',
+        startedAt: existing.startedAt || new Date(),
+      },
+      include: {
+        customer: true,
+        property: true,
+        zone: true,
+        complaintType: true,
+        assignedTo: true,
+      },
+    });
+
+    // Create timeline entry for clock in
+    await prisma.requestTimeline.create({
+      data: {
+        serviceRequestId,
+        action: 'CLOCK_IN',
+        description: 'Technician clocked in',
+        performedBy: userId,
+      },
+    });
+
+    return serviceRequest;
+  }
+
+  // Clock out - stop tracking time
+  async clockOut(serviceRequestId: string, employeeId: string, notes?: string, userId?: string) {
+    const existing = await prisma.serviceRequest.findUnique({
+      where: { id: serviceRequestId },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('Service request not found');
+    }
+
+    // Keep status as IN_PROGRESS (work not complete yet)
+    const serviceRequest = await prisma.serviceRequest.findUnique({
+      where: { id: serviceRequestId },
+      include: {
+        customer: true,
+        property: true,
+        zone: true,
+        complaintType: true,
+        assignedTo: true,
+      },
+    });
+
+    // Create timeline entry for clock out
+    await prisma.requestTimeline.create({
+      data: {
+        serviceRequestId,
+        action: 'CLOCK_OUT',
+        description: notes ? `Technician clocked out: ${notes}` : 'Technician clocked out',
         performedBy: userId,
       },
     });

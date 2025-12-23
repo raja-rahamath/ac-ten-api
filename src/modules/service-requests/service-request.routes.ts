@@ -99,4 +99,41 @@ router.delete(
   controller.unlinkAsset.bind(controller)
 );
 
+// Technician workflow routes
+router.post(
+  '/:id/start-route',
+  authorize('service_requests:write'),
+  controller.startRoute.bind(controller)
+);
+
+router.post(
+  '/:id/arrive',
+  authorize('service_requests:write'),
+  controller.markArrived.bind(controller)
+);
+
+router.post(
+  '/:id/start-work',
+  authorize('service_requests:write'),
+  controller.startWork.bind(controller)
+);
+
+router.post(
+  '/:id/complete',
+  authorize('service_requests:write'),
+  controller.complete.bind(controller)
+);
+
+router.post(
+  '/:id/clock-in',
+  authorize('service_requests:write'),
+  controller.clockIn.bind(controller)
+);
+
+router.post(
+  '/:id/clock-out',
+  authorize('service_requests:write'),
+  controller.clockOut.bind(controller)
+);
+
 export default router;

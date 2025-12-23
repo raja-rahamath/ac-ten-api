@@ -103,6 +103,7 @@ export class ServiceRequestController {
       const userContext = req.user ? {
         role: req.user.role,
         departmentId: req.user.departmentId,
+        userId: req.user.id, // For assignedToMe filter
       } : undefined;
 
       // Build query with automatic customer filter for customer role
@@ -272,6 +273,104 @@ export class ServiceRequestController {
     try {
       const serviceRequest = await serviceRequestService.unlinkAsset(
         req.params.id,
+        req.user?.id
+      );
+      res.json({
+        success: true,
+        data: serviceRequest,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Technician workflow methods
+  async startRoute(req: Request, res: Response, next: NextFunction) {
+    try {
+      const serviceRequest = await serviceRequestService.startRoute(
+        req.params.id,
+        req.body.employeeId || req.user?.id,
+        req.user?.id
+      );
+      res.json({
+        success: true,
+        data: serviceRequest,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async markArrived(req: Request, res: Response, next: NextFunction) {
+    try {
+      const serviceRequest = await serviceRequestService.markArrived(
+        req.params.id,
+        req.body.employeeId || req.user?.id,
+        req.user?.id
+      );
+      res.json({
+        success: true,
+        data: serviceRequest,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async startWork(req: Request, res: Response, next: NextFunction) {
+    try {
+      const serviceRequest = await serviceRequestService.startWork(
+        req.params.id,
+        req.body.employeeId || req.user?.id,
+        req.user?.id
+      );
+      res.json({
+        success: true,
+        data: serviceRequest,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async complete(req: Request, res: Response, next: NextFunction) {
+    try {
+      const serviceRequest = await serviceRequestService.complete(
+        req.params.id,
+        req.body.resolution,
+        req.user?.id
+      );
+      res.json({
+        success: true,
+        data: serviceRequest,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async clockIn(req: Request, res: Response, next: NextFunction) {
+    try {
+      const serviceRequest = await serviceRequestService.clockIn(
+        req.params.id,
+        req.body.employeeId || req.user?.id,
+        req.user?.id
+      );
+      res.json({
+        success: true,
+        data: serviceRequest,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async clockOut(req: Request, res: Response, next: NextFunction) {
+    try {
+      const serviceRequest = await serviceRequestService.clockOut(
+        req.params.id,
+        req.body.employeeId || req.user?.id,
+        req.body.notes,
         req.user?.id
       );
       res.json({
